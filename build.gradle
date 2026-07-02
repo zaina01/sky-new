@@ -1,0 +1,150 @@
+import java.nio.file.Files
+import java.nio.file.StandardCopyOption
+import java.util.zip.ZipEntry
+import java.util.zip.ZipFile
+import java.util.zip.ZipOutputStream
+
+plugins {
+    id 'java'
+    id 'com.google.protobuf' version '0.9.5' apply false
+    id 'org.springframework.boot' version '3.5.7' apply false
+    id 'io.spring.dependency-management' version '1.1.7' apply false
+}
+
+group = 'io.github.zaina01'
+version = '1.0-SNAPSHOT'
+
+ext.mergeServiceFilesIntoJar = { jarTaskProvider ->
+    def targetProject = jarTaskProvider.get().project
+    def jarTaskName = jarTaskProvider.get().name
+    def mergedServicesDir = targetProject.layout.buildDirectory.dir("generated/merged-services/${jarTaskName}")
+    def mergeTask = targetProject.tasks.register("${jarTaskName}MergeServiceFiles") {
+        inputs.files(targetProject.configurations.runtimeClasspath)
+        inputs.files(targetProject.sourceSets.main.resources)
+        outputs.dir(mergedServicesDir)
+        doLast {
+            def outputRoot = mergedServicesDir.get().asFile
+            targetProject.delete(outputRoot)
+            def services = new LinkedHashMap<String, LinkedHashSet<String>>()
+            def addProvider = { String serviceName, String line ->
+                def provider = line.trim()
+                if (provider && !provider.startsWith('#')) {
+                    services.computeIfAbsent(serviceName) { new LinkedHashSet<String>() }.add(provider)
+                }
+            }
+            def addServiceFile = { File serviceFile, String serviceName ->
+                serviceFile.withReader('UTF-8') { reader ->
+                    reader.eachLine { line -> addProvider(serviceName, line) }
+                }
+            }
+            targetProject.configurations.runtimeClasspath.each { File dependency ->
+                if (dependency.isDirectory()) {
+                    def servicesRoot = new File(dependency, 'META-INF/services')
+                    if (servicesRoot.isDirectory()) {
+                        targetProject.fileTree(servicesRoot).files.each { File serviceFile ->
+                            def serviceName = servicesRoot.toPath().relativize(serviceFile.toPath()).toString().replace(File.separatorChar, '/' as char)
+                            addServiceFile(serviceFile, serviceName)
+                        }
+                    }
+                } else if (dependency.name.endsWith('.jar')) {
+                    new ZipFile(dependency).withCloseable { zip ->
+                        zip.entries().each { entry ->
+                            if (!entry.directory && entry.name.startsWith('META-INF/services/')) {
+                                def serviceName = entry.name.substring('META-INF/services/'.length())
+                                zip.getInputStream(entry).withCloseable { input ->
+                                    input.newReader('UTF-8').withCloseable { reader ->
+                                        reader.eachLine { line -> addProvider(serviceName, line) }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            targetProject.sourceSets.main.resources.srcDirs.each { File resourceDir ->
+                def servicesRoot = new File(resourceDir, 'META-INF/services')
+                if (servicesRoot.isDirectory()) {
+                    targetProject.fileTree(servicesRoot).files.each { File serviceFile ->
+                        def serviceName = servicesRoot.toPath().relativize(serviceFile.toPath()).toString().replace(File.separatorChar, '/' as char)
+                        addServiceFile(serviceFile, serviceName)
+                    }
+                }
+            }
+            services.each { serviceName, providers ->
+                def serviceFile = new File(outputRoot, "META-INF/services/${serviceName}")
+                serviceFile.parentFile.mkdirs()
+                serviceFile.text = providers.join(System.lineSeparator()) + System.lineSeparator()
+            }
+        }
+    }
+    jarTaskProvider.configure { jarTask ->
+        jarTask.dependsOn mergeTask
+        jarTask.doLast {
+            def jarFile = jarTask.archiveFile.get().asFile
+            def tempFile = new File(jarFile.parentFile, "${jarFile.name}.tmp")
+            def serviceRoot = mergedServicesDir.get().asFile.toPath().resolve('META-INF/services')
+            def writtenEntries = new LinkedHashSet<String>()
+            new ZipOutputStream(new FileOutputStream(tempFile)).withCloseable { output ->
+                new ZipFile(jarFile).withCloseable { inputJar ->
+                    inputJar.entries().each { entry ->
+                        if (!entry.name.startsWith('META-INF/services/')) {
+                            output.putNextEntry(new ZipEntry(entry.name))
+                            if (!entry.directory) {
+                                inputJar.getInputStream(entry).withCloseable { input -> input.transferTo(output) }
+                            }
+                            output.closeEntry()
+                        }
+                    }
+                }
+                if (Files.isDirectory(serviceRoot)) {
+                    Files.walk(serviceRoot).withCloseable { paths ->
+                        paths.filter { Files.isRegularFile(it) }.forEach { path ->
+                            def entryName = 'META-INF/services/' + serviceRoot.relativize(path).toString().replace(File.separatorChar, '/' as char)
+                            if (writtenEntries.add(entryName)) {
+                                output.putNextEntry(new ZipEntry(entryName))
+                                Files.copy(path, output)
+                                output.closeEntry()
+                            }
+                        }
+                    }
+                }
+            }
+            Files.move(tempFile.toPath(), jarFile.toPath(), StandardCopyOption.REPLACE_EXISTING)
+        }
+    }
+}
+
+ext {
+    grpcVersion = '1.80.0'
+    protobufVersion = '3.25.5'
+    jacksonVersion = '3.1.2'
+    slf4jVersion = '2.0.16'
+    junitVersion = '5.10.0'
+}
+
+subprojects {
+    apply plugin: 'java'
+
+    group = rootProject.group
+    version = rootProject.version
+
+    java {
+        toolchain {
+            languageVersion = JavaLanguageVersion.of(25)
+        }
+    }
+
+    tasks.withType(JavaCompile).configureEach {
+        options.encoding = 'UTF-8'
+    }
+
+    test {
+        useJUnitPlatform()
+    }
+
+    dependencies {
+        testImplementation platform("org.junit:junit-bom:${rootProject.ext.junitVersion}")
+        testImplementation 'org.junit.jupiter:junit-jupiter'
+        testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+    }
+}

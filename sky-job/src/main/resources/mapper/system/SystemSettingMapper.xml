@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.sky.job.system.mapper.SystemSettingMapper">
+    <resultMap id="SystemSettingResultMap" type="com.sky.job.system.SystemSetting">
+        <constructor>
+            <arg column="setting_key" javaType="java.lang.String"/>
+            <arg column="category" javaType="java.lang.String"/>
+            <arg column="value_text" javaType="java.lang.String"/>
+            <arg column="value_type" javaType="java.lang.String"/>
+            <arg column="description" javaType="java.lang.String"/>
+            <arg column="editable" javaType="_boolean"/>
+            <arg column="updated_by" javaType="java.lang.String"/>
+            <arg column="created_at" javaType="java.time.LocalDateTime"/>
+            <arg column="updated_at" javaType="java.time.LocalDateTime"/>
+        </constructor>
+    </resultMap>
+
+    <select id="list" resultMap="SystemSettingResultMap">
+        SELECT *
+        FROM system_setting
+        <where>
+            <if test="category != null and category != ''">
+                category = #{category}
+            </if>
+        </where>
+        ORDER BY category ASC, setting_key ASC
+    </select>
+
+    <select id="listAll" resultMap="SystemSettingResultMap">
+        SELECT *
+        FROM system_setting
+        ORDER BY category ASC, setting_key ASC
+    </select>
+
+    <select id="findByKey" resultMap="SystemSettingResultMap">
+        SELECT *
+        FROM system_setting
+        WHERE setting_key = #{settingKey}
+    </select>
+
+    <insert id="insertIfAbsent">
+        INSERT IGNORE INTO system_setting (setting_key, category, value_text, value_type, description, editable, updated_by)
+        VALUES (#{settingKey}, #{category}, #{valueText}, #{valueType}, #{description}, #{editable}, #{updatedBy})
+    </insert>
+
+    <update id="updateValue">
+        UPDATE system_setting
+        SET value_text = #{valueText}, updated_by = #{updatedBy}, updated_at = CURRENT_TIMESTAMP
+        WHERE setting_key = #{settingKey}
+    </update>
+</mapper>

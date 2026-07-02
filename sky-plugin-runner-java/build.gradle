@@ -1,0 +1,31 @@
+plugins {
+    id 'application'
+}
+
+dependencies {
+    implementation project(':sky-plugin-api')
+    implementation project(':sky-plugin-protocol')
+    implementation "io.grpc:grpc-netty-shaded:${rootProject.ext.grpcVersion}"
+    implementation "io.grpc:grpc-stub:${rootProject.ext.grpcVersion}"
+    implementation "io.grpc:grpc-protobuf:${rootProject.ext.grpcVersion}"
+    implementation "tools.jackson.core:jackson-databind:${rootProject.ext.jacksonVersion}"
+    implementation "org.slf4j:slf4j-api:${rootProject.ext.slf4jVersion}"
+    runtimeOnly "org.slf4j:slf4j-simple:${rootProject.ext.slf4jVersion}"
+}
+
+application {
+    mainClass = 'com.sky.plugin.runner.PluginRunnerMain'
+}
+
+jar {
+    dependsOn configurations.runtimeClasspath
+    manifest {
+        attributes 'Main-Class': application.mainClass.get()
+    }
+    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+    from {
+        configurations.runtimeClasspath.collect { it.isDirectory() ? it : zipTree(it) }
+    }
+}
+
+rootProject.ext.mergeServiceFilesIntoJar(tasks.named('jar'))

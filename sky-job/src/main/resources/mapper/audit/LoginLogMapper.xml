@@ -1,0 +1,79 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.sky.job.audit.mapper.LoginLogMapper">
+    <resultMap id="LoginLogResultMap" type="com.sky.job.audit.LoginLog">
+        <constructor>
+            <arg column="id" javaType="java.lang.Long"/>
+            <arg column="user_id" javaType="java.lang.String"/>
+            <arg column="username" javaType="java.lang.String"/>
+            <arg column="status" javaType="java.lang.String"/>
+            <arg column="login_time" javaType="java.time.LocalDateTime"/>
+            <arg column="device_type" javaType="java.lang.String"/>
+            <arg column="login_ip" javaType="java.lang.String"/>
+            <arg column="ip_type" javaType="java.lang.String"/>
+            <arg column="user_agent" javaType="java.lang.String"/>
+            <arg column="fail_reason" javaType="java.lang.String"/>
+            <arg column="request_uri" javaType="java.lang.String"/>
+            <arg column="request_method" javaType="java.lang.String"/>
+            <arg column="remark" javaType="java.lang.String"/>
+        </constructor>
+    </resultMap>
+
+    <insert id="insert">
+        INSERT INTO login_log (user_id, username, status, device_type, login_ip, ip_type, user_agent, fail_reason, request_uri, request_method)
+        VALUES (#{userId}, #{username}, #{status}, #{deviceType}, #{loginIp}, #{ipType}, #{userAgent}, #{failReason}, #{requestUri}, #{requestMethod})
+    </insert>
+
+    <sql id="filters">
+        <where>
+            <if test="username != null and username != ''">
+                username LIKE #{usernameLike}
+            </if>
+            <if test="userId != null and userId != ''">
+                AND user_id = #{userId}
+            </if>
+            <if test="status != null and status != ''">
+                AND status = #{status}
+            </if>
+            <if test="loginIp != null and loginIp != ''">
+                AND login_ip = #{loginIp}
+            </if>
+            <if test="deviceType != null and deviceType != ''">
+                AND device_type = #{deviceType}
+            </if>
+            <if test="startTime != null">
+                AND login_time &gt;= #{startTime}
+            </if>
+            <if test="endTime != null">
+                AND login_time &lt;= #{endTime}
+            </if>
+        </where>
+    </sql>
+
+    <select id="list" resultMap="LoginLogResultMap">
+        SELECT *
+        FROM login_log
+        <include refid="filters"/>
+        ORDER BY login_time DESC, id DESC
+        LIMIT #{limit} OFFSET #{offset}
+    </select>
+
+    <select id="count" resultType="long">
+        SELECT COUNT(*)
+        FROM login_log
+        <include refid="filters"/>
+    </select>
+
+    <select id="countOlderThan" resultType="long">
+        SELECT COUNT(*) FROM login_log WHERE login_time &lt; #{cutoff}
+    </select>
+
+    <delete id="deleteOlderThan">
+        DELETE FROM login_log
+        WHERE login_time &lt; #{cutoff}
+        ORDER BY id
+        LIMIT #{limit}
+    </delete>
+</mapper>

@@ -1,0 +1,101 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.sky.job.audit.mapper.SystemLogMapper">
+    <resultMap id="SystemLogResultMap" type="com.sky.job.audit.SystemLog">
+        <constructor>
+            <arg column="id" javaType="java.lang.Long"/>
+            <arg column="module" javaType="java.lang.String"/>
+            <arg column="action" javaType="java.lang.String"/>
+            <arg column="level" javaType="java.lang.String"/>
+            <arg column="status" javaType="java.lang.String"/>
+            <arg column="operator_user_id" javaType="java.lang.String"/>
+            <arg column="operator_name" javaType="java.lang.String"/>
+            <arg column="source_type" javaType="java.lang.String"/>
+            <arg column="request_uri" javaType="java.lang.String"/>
+            <arg column="request_method" javaType="java.lang.String"/>
+            <arg column="ip" javaType="java.lang.String"/>
+            <arg column="user_agent" javaType="java.lang.String"/>
+            <arg column="target_type" javaType="java.lang.String"/>
+            <arg column="target_id" javaType="java.lang.String"/>
+            <arg column="message" javaType="java.lang.String"/>
+            <arg column="detail" javaType="java.lang.String"/>
+            <arg column="remark" javaType="java.lang.String"/>
+            <arg column="create_time" javaType="java.time.LocalDateTime"/>
+        </constructor>
+    </resultMap>
+
+    <insert id="insert">
+        INSERT INTO system_log (module, action, level, status, operator_user_id, operator_name, source_type, request_uri, request_method, ip, user_agent, target_type, target_id, message)
+        VALUES (#{module}, #{action}, #{level}, #{status}, #{operatorUserId}, #{operatorName}, #{sourceType}, #{requestUri}, #{requestMethod}, #{ip}, #{userAgent}, #{targetType}, #{targetId}, #{message})
+    </insert>
+
+    <insert id="insertSystem">
+        INSERT INTO system_log (module, action, level, status, source_type, target_type, target_id, message)
+        VALUES (#{module}, #{action}, #{level}, #{status}, #{sourceType}, #{targetType}, #{targetId}, #{message})
+    </insert>
+
+    <sql id="filters">
+        <where>
+            <if test="module != null and module != ''">
+                module = #{module}
+            </if>
+            <if test="action != null and action != ''">
+                AND action = #{action}
+            </if>
+            <if test="level != null and level != ''">
+                AND level = #{level}
+            </if>
+            <if test="status != null and status != ''">
+                AND status = #{status}
+            </if>
+            <if test="operatorUserId != null and operatorUserId != ''">
+                AND operator_user_id = #{operatorUserId}
+            </if>
+            <if test="operatorName != null and operatorName != ''">
+                AND operator_name LIKE #{operatorNameLike}
+            </if>
+            <if test="sourceType != null and sourceType != ''">
+                AND source_type = #{sourceType}
+            </if>
+            <if test="targetType != null and targetType != ''">
+                AND target_type = #{targetType}
+            </if>
+            <if test="targetId != null and targetId != ''">
+                AND target_id = #{targetId}
+            </if>
+            <if test="startTime != null">
+                AND create_time &gt;= #{startTime}
+            </if>
+            <if test="endTime != null">
+                AND create_time &lt;= #{endTime}
+            </if>
+        </where>
+    </sql>
+
+    <select id="list" resultMap="SystemLogResultMap">
+        SELECT *
+        FROM system_log
+        <include refid="filters"/>
+        ORDER BY create_time DESC, id DESC
+        LIMIT #{limit} OFFSET #{offset}
+    </select>
+
+    <select id="count" resultType="long">
+        SELECT COUNT(*)
+        FROM system_log
+        <include refid="filters"/>
+    </select>
+
+    <select id="countOlderThan" resultType="long">
+        SELECT COUNT(*) FROM system_log WHERE create_time &lt; #{cutoff}
+    </select>
+
+    <delete id="deleteOlderThan">
+        DELETE FROM system_log
+        WHERE create_time &lt; #{cutoff}
+        ORDER BY id
+        LIMIT #{limit}
+    </delete>
+</mapper>

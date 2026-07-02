@@ -1,0 +1,111 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.sky.job.user.mapper.UserMapper">
+    <resultMap id="UserResultMap" type="com.sky.job.user.User">
+        <constructor>
+            <arg column="user_id" javaType="java.lang.String"/>
+            <arg column="username" javaType="java.lang.String"/>
+            <arg column="password_hash" javaType="java.lang.String"/>
+            <arg column="email" javaType="java.lang.String"/>
+            <arg column="phone" javaType="java.lang.String"/>
+            <arg column="avatar" javaType="java.lang.String"/>
+            <arg column="enabled" javaType="_boolean"/>
+            <arg column="created_at" javaType="java.time.LocalDateTime"/>
+            <arg column="updated_at" javaType="java.time.LocalDateTime"/>
+        </constructor>
+    </resultMap>
+
+    <select id="countUsers" resultType="int">SELECT COUNT(*) FROM sky_user</select>
+    <select id="countByUsername" resultType="int">SELECT COUNT(*) FROM sky_user WHERE username = #{username}</select>
+    <select id="countByEmail" resultType="int">SELECT COUNT(*) FROM sky_user WHERE email = #{email}</select>
+    <select id="countByPhone" resultType="int">SELECT COUNT(*) FROM sky_user WHERE phone = #{phone}</select>
+    <select id="countByEmailForOtherUser" resultType="int">SELECT COUNT(*) FROM sky_user WHERE email = #{email} AND user_id &lt;&gt; #{userId}</select>
+    <select id="countByPhoneForOtherUser" resultType="int">SELECT COUNT(*) FROM sky_user WHERE phone = #{phone} AND user_id &lt;&gt; #{userId}</select>
+
+    <select id="findByUsername" resultMap="UserResultMap">SELECT * FROM sky_user WHERE username = #{username}</select>
+    <select id="findByUserId" resultMap="UserResultMap">SELECT * FROM sky_user WHERE user_id = #{userId}</select>
+
+    <sql id="filters">
+        <where>
+            <if test="username != null and username != ''">
+                username LIKE #{usernameLike}
+            </if>
+            <if test="enabled != null">
+                AND enabled = #{enabled}
+            </if>
+        </where>
+    </sql>
+
+    <select id="list" resultMap="UserResultMap">
+        SELECT *
+        FROM sky_user
+        <include refid="filters"/>
+        ORDER BY created_at DESC
+        LIMIT #{limit} OFFSET #{offset}
+    </select>
+
+    <select id="count" resultType="long">
+        SELECT COUNT(*)
+        FROM sky_user
+        <include refid="filters"/>
+    </select>
+
+    <insert id="insert">
+        INSERT INTO sky_user (user_id, username, password_hash, email, phone, avatar, enabled)
+        VALUES (#{userId}, #{username}, #{passwordHash}, #{email}, #{phone}, #{avatar}, #{enabled})
+    </insert>
+
+    <update id="updatePassword">
+        UPDATE sky_user SET password_hash = #{passwordHash}, updated_at = CURRENT_TIMESTAMP WHERE user_id = #{userId}
+    </update>
+
+    <update id="updateProfile">
+        UPDATE sky_user
+        SET email = #{email}, phone = #{phone}, avatar = #{avatar}, enabled = #{enabled}, updated_at = CURRENT_TIMESTAMP
+        WHERE user_id = #{userId}
+    </update>
+
+    <update id="updateEnabled">
+        UPDATE sky_user SET enabled = #{enabled}, updated_at = CURRENT_TIMESTAMP WHERE user_id = #{userId}
+    </update>
+
+    <delete id="deleteUserRoles">DELETE FROM sky_user_role WHERE user_id = #{userId}</delete>
+    <delete id="delete">DELETE FROM sky_user WHERE user_id = #{userId}</delete>
+
+    <select id="countEnabledAdmins" resultType="long">
+        SELECT COUNT(DISTINCT u.user_id)
+        FROM sky_user u
+        JOIN sky_user_role ur ON ur.user_id = u.user_id
+        JOIN sky_role r ON r.role_id = ur.role_id
+        WHERE u.enabled = TRUE AND r.role_name = 'ADMIN'
+    </select>
+
+    <select id="countRole" resultType="int">
+        SELECT COUNT(*)
+        FROM sky_user_role ur
+        JOIN sky_role r ON r.role_id = ur.role_id
+        WHERE ur.user_id = #{userId} AND r.role_name = #{roleName}
+    </select>
+
+    <insert id="assignRole">
+        INSERT IGNORE INTO sky_user_role (user_id, role_id)
+        SELECT #{userId}, role_id FROM sky_role WHERE role_name = #{roleName}
+    </insert>
+
+    <select id="roles" resultType="java.lang.String">
+        SELECT r.role_name
+        FROM sky_role r
+        JOIN sky_user_role ur ON ur.role_id = r.role_id
+        WHERE ur.user_id = #{userId}
+    </select>
+
+    <select id="permissions" resultType="java.lang.String">
+        SELECT DISTINCT p.permission_name
+        FROM sky_permission p
+        JOIN sky_role_permission rp ON rp.permission_id = p.permission_id
+        JOIN sky_user_role ur ON ur.role_id = rp.role_id
+        WHERE ur.user_id = #{userId}
+    </select>
+</mapper>

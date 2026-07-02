@@ -1,0 +1,110 @@
+server:
+  port: ${SKY_HTTP_PORT:8080}
+  servlet:
+    context-path: /api
+
+spring:
+  datasource:
+    url: ${SKY_DB_URL:jdbc:mysql://localhost:3306/sky_new?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai&useSSL=false&allowPublicKeyRetrieval=true}
+    username: ${SKY_DB_USERNAME:root}
+    password: ${SKY_DB_PASSWORD:root}
+    driver-class-name: com.mysql.cj.jdbc.Driver
+  servlet:
+    multipart:
+      max-file-size: ${SKY_PLUGIN_UPLOAD_MAX_FILE_SIZE:50MB}
+      max-request-size: ${SKY_PLUGIN_UPLOAD_MAX_REQUEST_SIZE:50MB}
+  quartz:
+    job-store-type: memory
+    auto-startup: true
+    overwrite-existing-jobs: true
+    properties:
+      org:
+        quartz:
+          scheduler:
+            instanceName: sky-new-scheduler
+          threadPool:
+            threadCount: 10
+            threadPriority: 5
+
+mybatis:
+  mapper-locations: classpath*:mapper/**/*.xml
+  configuration:
+    map-underscore-to-camel-case: true
+
+sky:
+  retention:
+    enabled: ${SKY_RETENTION_ENABLED:false}
+    scheduled-enabled: ${SKY_RETENTION_SCHEDULED_ENABLED:false}
+    cron: "${SKY_RETENTION_CRON:0 0 3 * * ?}"
+    dry-run: ${SKY_RETENTION_DRY_RUN:true}
+    minimum-retention-days: ${SKY_RETENTION_MINIMUM_DAYS:7}
+    batch-size: ${SKY_RETENTION_BATCH_SIZE:1000}
+    job-execution-days: ${SKY_RETENTION_JOB_EXECUTION_DAYS:90}
+    plugin-task-log-days: ${SKY_RETENTION_PLUGIN_TASK_LOG_DAYS:90}
+    plugin-audit-log-days: ${SKY_RETENTION_PLUGIN_AUDIT_LOG_DAYS:180}
+    login-log-days: ${SKY_RETENTION_LOGIN_LOG_DAYS:180}
+    system-log-days: ${SKY_RETENTION_SYSTEM_LOG_DAYS:180}
+    notification-send-history-days: ${SKY_RETENTION_NOTIFICATION_SEND_HISTORY_DAYS:180}
+  notification:
+    alert-channel-ids: ${SKY_NOTIFICATION_ALERT_CHANNEL_IDS:}
+    max-title-bytes: ${SKY_NOTIFICATION_MAX_TITLE_BYTES:512}
+    max-content-bytes: ${SKY_NOTIFICATION_MAX_CONTENT_BYTES:8192}
+    max-preview-chars: ${SKY_NOTIFICATION_MAX_PREVIEW_CHARS:500}
+    http-timeout: ${SKY_NOTIFICATION_HTTP_TIMEOUT:10s}
+    retry-enabled: ${SKY_NOTIFICATION_RETRY_ENABLED:true}
+    retry-cron: "${SKY_NOTIFICATION_RETRY_CRON:0/30 * * * * ?}"
+    retry-batch-size: ${SKY_NOTIFICATION_RETRY_BATCH_SIZE:20}
+    retry-max-attempts: ${SKY_NOTIFICATION_RETRY_MAX_ATTEMPTS:3}
+    retry-initial-delay: ${SKY_NOTIFICATION_RETRY_INITIAL_DELAY:30s}
+    retry-max-delay: ${SKY_NOTIFICATION_RETRY_MAX_DELAY:10m}
+    retry-stale-timeout: ${SKY_NOTIFICATION_RETRY_STALE_TIMEOUT:5m}
+  security:
+    jwt-secret: ${SKY_JWT_SECRET:abcdzxxcvbnmhgfrree1asdfrtyuiop9}
+    jwt-expiration: ${SKY_JWT_EXPIRATION:86400}
+    jwt-issuer: ${SKY_JWT_ISSUER:sky-new}
+  plugin:
+    host-grpc:
+      bind-host: ${SKY_HOST_GRPC_BIND_HOST:127.0.0.1}
+      port: ${SKY_HOST_GRPC_PORT:19090}
+      max-inbound-message-bytes: ${SKY_HOST_GRPC_MAX_INBOUND_MESSAGE_BYTES:1048576}
+    storage-root: ${SKY_PLUGIN_STORAGE_ROOT:./data/plugins}
+    artifact-root: ${SKY_PLUGIN_ARTIFACT_ROOT:./data/plugins/artifacts}
+    runtime-work-root: ${SKY_PLUGIN_RUNTIME_WORK_ROOT:./data/plugins/runtime}
+    runtime-log-root: ${SKY_PLUGIN_RUNTIME_LOG_ROOT:./data/plugins/logs}
+    security:
+      token-ttl: ${SKY_PLUGIN_TOKEN_TTL:30m}
+    storage:
+      max-data-json-bytes: ${SKY_PLUGIN_MAX_DATA_JSON_BYTES:65536}
+      max-config-json-bytes: ${SKY_PLUGIN_MAX_CONFIG_JSON_BYTES:65536}
+      max-account-json-bytes: ${SKY_PLUGIN_MAX_ACCOUNT_JSON_BYTES:65536}
+      max-log-message-bytes: ${SKY_PLUGIN_MAX_LOG_MESSAGE_BYTES:8192}
+      select-all-limit: ${SKY_PLUGIN_SELECT_ALL_LIMIT:100}
+      max-data-rows-per-plugin: ${SKY_PLUGIN_MAX_DATA_ROWS_PER_PLUGIN:10000}
+    upload:
+      artifact-root: ${SKY_PLUGIN_ARTIFACT_ROOT:./data/plugins/artifacts}
+      max-artifact-bytes: ${SKY_PLUGIN_UPLOAD_MAX_ARTIFACT_BYTES:52428800}
+    dependencies:
+      repository-root: ${SKY_PLUGIN_MAVEN_REPOSITORY_ROOT:./data/plugins/maven-repository}
+      remote-repositories:
+        - ${SKY_PLUGIN_MAVEN_CENTRAL_URL:https://repo1.maven.org/maven2/}
+      max-declared-dependencies: ${SKY_PLUGIN_MAX_DECLARED_DEPENDENCIES:50}
+      max-resolved-artifacts: ${SKY_PLUGIN_MAX_RESOLVED_ARTIFACTS:300}
+      allow-snapshots: ${SKY_PLUGIN_ALLOW_SNAPSHOT_DEPENDENCIES:false}
+    runtime:
+      type: process
+      process:
+        startup-timeout: 10s
+        stop-timeout: 5s
+        task-timeout: 120s
+        service-call-timeout: ${SKY_PLUGIN_SERVICE_CALL_TIMEOUT:10s}
+        max-service-call-timeout: ${SKY_PLUGIN_MAX_SERVICE_CALL_TIMEOUT:30s}
+        service-idle-timeout: ${SKY_PLUGIN_SERVICE_IDLE_TIMEOUT:10m}
+        service-idle-scan-interval: ${SKY_PLUGIN_SERVICE_IDLE_SCAN_INTERVAL:1m}
+        max-restarts: 3
+        java-command: ${SKY_PLUGIN_JAVA_COMMAND:java}
+        max-heap: ${SKY_PLUGIN_MAX_HEAP:256m}
+        runner-jar: ${SKY_PLUGIN_RUNNER_JAR:./sky-plugin-runner-java/build/libs/sky-plugin-runner-java-1.0-SNAPSHOT.jar}
+        max-inbound-message-bytes: ${SKY_PLUGIN_GRPC_MAX_INBOUND_MESSAGE_BYTES:1048576}
+        artifact-root: ${SKY_PLUGIN_ARTIFACT_ROOT:./data/plugins/artifacts}
+        work-root: ${SKY_PLUGIN_RUNTIME_WORK_ROOT:./data/plugins/runtime}
+        log-root: ${SKY_PLUGIN_RUNTIME_LOG_ROOT:./data/plugins/logs}

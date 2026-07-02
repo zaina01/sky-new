@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.sky.job.plugin.storage.mapper.PluginDataMapper">
+    <select id="countByKey" resultType="int">
+        SELECT COUNT(*)
+        FROM plugin_data
+        WHERE plugin_id = #{pluginId} AND collection_name = #{collection} AND data_key = #{dataKey}
+    </select>
+
+    <select id="countRows" resultType="int">
+        SELECT COUNT(*)
+        FROM plugin_data
+        WHERE plugin_id = #{pluginId}
+    </select>
+
+    <insert id="upsert">
+        INSERT INTO plugin_data (plugin_id, collection_name, data_key, data_json)
+        VALUES (#{pluginId}, #{collection}, #{dataKey}, CAST(#{dataJson} AS JSON))
+        ON DUPLICATE KEY UPDATE data_json = VALUES(data_json), updated_at = CURRENT_TIMESTAMP
+    </insert>
+
+    <delete id="delete">
+        DELETE FROM plugin_data
+        WHERE plugin_id = #{pluginId} AND collection_name = #{collection} AND data_key = #{dataKey}
+    </delete>
+
+    <delete id="deleteByPluginId">
+        DELETE FROM plugin_data
+        WHERE plugin_id = #{pluginId}
+    </delete>
+
+    <select id="select" resultType="java.lang.String">
+        SELECT data_json
+        FROM plugin_data
+        WHERE plugin_id = #{pluginId} AND collection_name = #{collection} AND data_key = #{dataKey}
+    </select>
+
+    <select id="selectAll" resultType="java.lang.String">
+        SELECT JSON_ARRAYAGG(JSON_OBJECT('key', data_key, 'json', CAST(data_json AS JSON))) AS json_value
+        FROM (
+          SELECT data_key, data_json
+          FROM plugin_data
+          WHERE plugin_id = #{pluginId} AND collection_name = #{collection}
+          ORDER BY id
+          LIMIT #{limit}
+        ) limited_data
+    </select>
+</mapper>

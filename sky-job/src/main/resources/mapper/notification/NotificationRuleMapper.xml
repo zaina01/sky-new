@@ -1,0 +1,93 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.sky.job.notification.mapper.NotificationRuleMapper">
+    <resultMap id="NotificationRuleRowResultMap" type="com.sky.job.notification.mapper.NotificationRuleRow">
+        <constructor>
+            <arg column="id" javaType="_long"/>
+            <arg column="rule_id" javaType="java.lang.String"/>
+            <arg column="display_name" javaType="java.lang.String"/>
+            <arg column="enabled" javaType="_boolean"/>
+            <arg column="event_type" javaType="java.lang.String"/>
+            <arg column="plugin_id" javaType="java.lang.String"/>
+            <arg column="job_id" javaType="java.lang.String"/>
+            <arg column="severity" javaType="java.lang.String"/>
+            <arg column="channel_ids_json" javaType="java.lang.String"/>
+            <arg column="remark" javaType="java.lang.String"/>
+            <arg column="created_by" javaType="java.lang.String"/>
+            <arg column="updated_by" javaType="java.lang.String"/>
+            <arg column="created_at" javaType="java.time.LocalDateTime"/>
+            <arg column="updated_at" javaType="java.time.LocalDateTime"/>
+        </constructor>
+    </resultMap>
+
+    <sql id="filters">
+        <where>
+            <if test="eventType != null">
+                event_type = #{eventType}
+            </if>
+            <if test="enabled != null">
+                AND enabled = #{enabled}
+            </if>
+            <if test="pluginId != null and pluginId != ''">
+                AND plugin_id = #{pluginId}
+            </if>
+            <if test="jobId != null and jobId != ''">
+                AND job_id = #{jobId}
+            </if>
+        </where>
+    </sql>
+
+    <select id="list" resultMap="NotificationRuleRowResultMap">
+        SELECT *
+        FROM notification_rule
+        <include refid="filters"/>
+        ORDER BY id DESC
+        LIMIT #{limit} OFFSET #{offset}
+    </select>
+
+    <select id="count" resultType="long">
+        SELECT COUNT(*)
+        FROM notification_rule
+        <include refid="filters"/>
+    </select>
+
+    <select id="findByRuleId" resultMap="NotificationRuleRowResultMap">
+        SELECT * FROM notification_rule WHERE rule_id = #{ruleId}
+    </select>
+
+    <insert id="insert">
+        INSERT INTO notification_rule (rule_id, display_name, enabled, event_type, plugin_id, job_id, severity, channel_ids_json, remark, created_by, updated_by)
+        VALUES (#{ruleId}, #{displayName}, #{enabled}, #{eventType}, #{pluginId}, #{jobId}, #{severity}, CAST(#{channelIdsJson} AS JSON), #{remark}, #{createdBy}, #{createdBy})
+    </insert>
+
+    <update id="update">
+        UPDATE notification_rule
+        SET display_name = #{displayName}, enabled = #{enabled}, event_type = #{eventType}, plugin_id = #{pluginId}, job_id = #{jobId}, severity = #{severity}, channel_ids_json = CAST(#{channelIdsJson} AS JSON), remark = #{remark}, updated_by = #{updatedBy}, updated_at = CURRENT_TIMESTAMP
+        WHERE rule_id = #{ruleId}
+    </update>
+
+    <update id="updateEnabled">
+        UPDATE notification_rule
+        SET enabled = #{enabled}, updated_by = #{updatedBy}, updated_at = CURRENT_TIMESTAMP
+        WHERE rule_id = #{ruleId}
+    </update>
+
+    <delete id="delete">DELETE FROM notification_rule WHERE rule_id = #{ruleId}</delete>
+
+    <select id="listEnabledCandidates" resultMap="NotificationRuleRowResultMap">
+        SELECT *
+        FROM notification_rule
+        WHERE enabled = TRUE
+          AND event_type = #{eventType}
+          AND (plugin_id = '' OR plugin_id = #{pluginId})
+          AND (job_id = '' OR job_id = #{jobId})
+          AND (severity = '' OR severity = #{severity})
+        ORDER BY
+          CASE WHEN plugin_id &lt;&gt; '' THEN 1 ELSE 0 END DESC,
+          CASE WHEN job_id &lt;&gt; '' THEN 1 ELSE 0 END DESC,
+          CASE WHEN severity &lt;&gt; '' THEN 1 ELSE 0 END DESC,
+          id ASC
+    </select>
+</mapper>

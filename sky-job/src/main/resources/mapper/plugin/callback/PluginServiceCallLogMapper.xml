@@ -1,0 +1,82 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.sky.job.plugin.callback.mapper.PluginServiceCallLogMapper">
+    <resultMap id="PluginServiceCallLogResultMap" type="com.sky.job.plugin.callback.PluginServiceCallLog">
+        <constructor>
+            <arg column="id" javaType="_long"/>
+            <arg column="job_id" javaType="java.lang.Long"/>
+            <arg column="caller_plugin_id" javaType="java.lang.String"/>
+            <arg column="caller_instance_id" javaType="java.lang.String"/>
+            <arg column="caller_request_id" javaType="java.lang.String"/>
+            <arg column="target_plugin_id" javaType="java.lang.String"/>
+            <arg column="target_instance_id" javaType="java.lang.String"/>
+            <arg column="operation" javaType="java.lang.String"/>
+            <arg column="service_request_id" javaType="java.lang.String"/>
+            <arg column="target_runner_log_path" javaType="java.lang.String"/>
+            <arg column="timeout_millis" javaType="_long"/>
+            <arg column="duration_millis" javaType="_long"/>
+            <arg column="request_bytes" javaType="_int"/>
+            <arg column="response_bytes" javaType="_int"/>
+            <arg column="success" javaType="_boolean"/>
+            <arg column="error_type" javaType="java.lang.String"/>
+            <arg column="error_message" javaType="java.lang.String"/>
+            <arg column="created_at" javaType="java.time.LocalDateTime"/>
+        </constructor>
+    </resultMap>
+
+    <sql id="filters">
+        <where>
+            <if test="jobId != null">
+                job_id = #{jobId}
+            </if>
+            <if test="callerPluginId != null and callerPluginId != ''">
+                AND caller_plugin_id = #{callerPluginId}
+            </if>
+            <if test="targetPluginId != null and targetPluginId != ''">
+                AND target_plugin_id = #{targetPluginId}
+            </if>
+            <if test="operation != null and operation != ''">
+                AND operation = #{operation}
+            </if>
+            <if test="success != null">
+                AND success = #{success}
+            </if>
+        </where>
+    </sql>
+
+    <insert id="insert" parameterType="com.sky.job.plugin.callback.PluginServiceCallLogCommand">
+        INSERT INTO plugin_service_call_log (
+            job_id, caller_plugin_id, caller_instance_id, caller_request_id,
+            target_plugin_id, target_instance_id, operation, service_request_id,
+            target_runner_log_path, timeout_millis, duration_millis, request_bytes,
+            response_bytes, success, error_type, error_message
+        ) VALUES (
+            #{jobId}, #{callerPluginId}, #{callerInstanceId}, #{callerRequestId},
+            #{targetPluginId}, #{targetInstanceId}, #{operation}, #{serviceRequestId},
+            #{targetRunnerLogPath}, #{timeoutMillis}, #{durationMillis}, #{requestBytes},
+            #{responseBytes}, #{success}, #{errorType}, #{errorMessage}
+        )
+    </insert>
+
+    <select id="findById" resultMap="PluginServiceCallLogResultMap">
+        SELECT *
+        FROM plugin_service_call_log
+        WHERE id = #{id}
+    </select>
+
+    <select id="list" resultMap="PluginServiceCallLogResultMap">
+        SELECT *
+        FROM plugin_service_call_log
+        <include refid="filters"/>
+        ORDER BY id DESC
+        LIMIT #{limit} OFFSET #{offset}
+    </select>
+
+    <select id="count" resultType="long">
+        SELECT COUNT(*)
+        FROM plugin_service_call_log
+        <include refid="filters"/>
+    </select>
+</mapper>

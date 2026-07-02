@@ -1,0 +1,121 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.sky.job.scheduler.mapper.PluginRuntimeMetadataMapper">
+    <resultMap id="PluginRuntimeRowResultMap" type="com.sky.job.scheduler.mapper.PluginRuntimeRow">
+        <constructor>
+            <arg column="id" javaType="_long"/>
+            <arg column="plugin_id" javaType="java.lang.String"/>
+            <arg column="instance_id" javaType="java.lang.String"/>
+            <arg column="version" javaType="java.lang.String"/>
+            <arg column="display_name" javaType="java.lang.String"/>
+            <arg column="main_class" javaType="java.lang.String"/>
+            <arg column="artifact_path" javaType="java.lang.String"/>
+            <arg column="artifact_sha256" javaType="java.lang.String"/>
+            <arg column="runtime_type" javaType="java.lang.String"/>
+            <arg column="state" javaType="java.lang.String"/>
+            <arg column="runner_host" javaType="java.lang.String"/>
+            <arg column="runner_port" javaType="java.lang.Integer"/>
+            <arg column="work_dir" javaType="java.lang.String"/>
+            <arg column="capabilities_json" javaType="java.lang.String"/>
+            <arg column="config_schema_json" javaType="java.lang.String"/>
+            <arg column="account_schema_json" javaType="java.lang.String"/>
+            <arg column="dependency_jars_json" javaType="java.lang.String"/>
+            <arg column="started_at" javaType="java.time.LocalDateTime"/>
+            <arg column="created_at" javaType="java.time.LocalDateTime"/>
+            <arg column="updated_at" javaType="java.time.LocalDateTime"/>
+        </constructor>
+    </resultMap>
+
+    <select id="findByPluginId" resultMap="PluginRuntimeRowResultMap">
+        SELECT *
+        FROM plugin_runtime
+        WHERE plugin_id = #{pluginId}
+    </select>
+
+    <select id="listRuntimes" resultMap="PluginRuntimeRowResultMap">
+        SELECT *
+        FROM plugin_runtime
+        <where>
+            <if test="pluginId != null and pluginId != ''">
+                plugin_id = #{pluginId}
+            </if>
+            <if test="state != null">
+                AND state = #{state}
+            </if>
+        </where>
+        ORDER BY id DESC
+        LIMIT #{limit} OFFSET #{offset}
+    </select>
+
+    <select id="countRuntimes" resultType="long">
+        SELECT COUNT(*)
+        FROM plugin_runtime
+        <where>
+            <if test="pluginId != null and pluginId != ''">
+                plugin_id = #{pluginId}
+            </if>
+            <if test="state != null">
+                AND state = #{state}
+            </if>
+        </where>
+    </select>
+
+    <sql id="optionFilters">
+        <where>
+            <if test="keyword != null and keyword != ''">
+                (plugin_id LIKE #{keywordLike} OR display_name LIKE #{keywordLike})
+            </if>
+            <if test="state != null and state != ''">
+                AND state = #{state}
+            </if>
+            <if test="usage == 'JOB'">
+                AND JSON_CONTAINS(capabilities_json, 'true', '$.task')
+            </if>
+            <if test="usage == 'CONFIG'">
+                AND JSON_CONTAINS(capabilities_json, 'true', '$.config')
+            </if>
+            <if test="usage == 'ACCOUNT'">
+                AND JSON_CONTAINS(capabilities_json, 'true', '$.account')
+            </if>
+            <if test="usage == 'NOTIFICATION'">
+                AND JSON_CONTAINS(capabilities_json, 'true', '$.notification')
+            </if>
+            <if test="usage == 'SERVICE'">
+                AND JSON_CONTAINS(capabilities_json, 'true', '$.service')
+            </if>
+        </where>
+    </sql>
+
+    <select id="listOptions" resultMap="PluginRuntimeRowResultMap">
+        SELECT *
+        FROM plugin_runtime
+        <include refid="optionFilters"/>
+        ORDER BY plugin_id ASC
+        LIMIT #{limit} OFFSET #{offset}
+    </select>
+
+    <select id="countOptions" resultType="long">
+        SELECT COUNT(*)
+        FROM plugin_runtime
+        <include refid="optionFilters"/>
+    </select>
+
+    <update id="updateLifecycle">
+        UPDATE plugin_runtime
+        SET state = #{state}, runner_host = #{runnerHost}, runner_port = #{runnerPort}, work_dir = #{workDir}, started_at = #{startedAt}, updated_at = CURRENT_TIMESTAMP
+        WHERE plugin_id = #{pluginId}
+    </update>
+
+    <update id="stopStaleRunningRuntimes">
+        UPDATE plugin_runtime
+        SET state = 'STOPPED', runner_port = NULL, started_at = NULL, updated_at = CURRENT_TIMESTAMP
+        WHERE state IN ('STARTING', 'RUNNING')
+    </update>
+
+    <delete id="deleteByPluginId">
+        DELETE FROM plugin_runtime
+        WHERE plugin_id = #{pluginId}
+    </delete>
+</mapper>

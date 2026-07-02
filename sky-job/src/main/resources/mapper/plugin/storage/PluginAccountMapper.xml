@@ -1,0 +1,121 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.sky.job.plugin.storage.mapper.PluginAccountMapper">
+    <resultMap id="PluginAccountResultMap" type="com.sky.job.plugin.storage.PluginAccount">
+        <constructor>
+            <arg column="id" javaType="_long"/>
+            <arg column="plugin_id" javaType="java.lang.String"/>
+            <arg column="account_id" javaType="java.lang.String"/>
+            <arg column="display_name" javaType="java.lang.String"/>
+            <arg column="account_json" javaType="java.lang.String"/>
+            <arg column="enabled" javaType="_boolean"/>
+            <arg column="created_at" javaType="java.time.LocalDateTime"/>
+            <arg column="updated_at" javaType="java.time.LocalDateTime"/>
+        </constructor>
+    </resultMap>
+
+    <select id="listByPluginId" resultMap="PluginAccountResultMap">
+        SELECT *
+        FROM plugin_account
+        WHERE plugin_id = #{pluginId}
+        ORDER BY account_id
+    </select>
+
+    <select id="listEnabledByPluginId" resultMap="PluginAccountResultMap">
+        SELECT *
+        FROM plugin_account
+        WHERE plugin_id = #{pluginId} AND enabled = TRUE
+        ORDER BY account_id
+    </select>
+
+    <select id="getRecord" resultMap="PluginAccountResultMap">
+        SELECT *
+        FROM plugin_account
+        WHERE plugin_id = #{pluginId} AND account_id = #{accountId}
+    </select>
+
+    <select id="getEnabledRecord" resultMap="PluginAccountResultMap">
+        SELECT *
+        FROM plugin_account
+        WHERE plugin_id = #{pluginId} AND account_id = #{accountId} AND enabled = TRUE
+    </select>
+
+    <select id="listManaged" resultMap="PluginAccountResultMap">
+        SELECT *
+        FROM plugin_account
+        <where>
+            plugin_id = #{pluginId}
+            <if test="enabled != null">
+                AND enabled = #{enabled}
+            </if>
+            <if test="accountId != null and accountId != ''">
+                AND account_id = #{accountId}
+            </if>
+            <if test="displayName != null and displayName != ''">
+                AND display_name LIKE #{displayNameLike}
+            </if>
+        </where>
+        ORDER BY account_id ASC
+        LIMIT #{limit} OFFSET #{offset}
+    </select>
+
+    <select id="listManagedForExport" resultMap="PluginAccountResultMap">
+        SELECT *
+        FROM plugin_account
+        <where>
+            plugin_id = #{pluginId}
+            <if test="enabled != null">
+                AND enabled = #{enabled}
+            </if>
+            <if test="accountId != null and accountId != ''">
+                AND account_id = #{accountId}
+            </if>
+            <if test="displayName != null and displayName != ''">
+                AND display_name LIKE #{displayNameLike}
+            </if>
+        </where>
+        ORDER BY account_id ASC
+        LIMIT #{limit}
+    </select>
+
+    <select id="countManaged" resultType="long">
+        SELECT COUNT(*)
+        FROM plugin_account
+        <where>
+            plugin_id = #{pluginId}
+            <if test="enabled != null">
+                AND enabled = #{enabled}
+            </if>
+            <if test="accountId != null and accountId != ''">
+                AND account_id = #{accountId}
+            </if>
+            <if test="displayName != null and displayName != ''">
+                AND display_name LIKE #{displayNameLike}
+            </if>
+        </where>
+    </select>
+
+    <insert id="upsert">
+        INSERT INTO plugin_account (plugin_id, account_id, display_name, account_json, enabled)
+        VALUES (#{pluginId}, #{accountId}, #{displayName}, CAST(#{accountJson} AS JSON), #{enabled})
+        ON DUPLICATE KEY UPDATE display_name = VALUES(display_name), account_json = VALUES(account_json), enabled = VALUES(enabled), updated_at = CURRENT_TIMESTAMP
+    </insert>
+
+    <update id="updateEnabled">
+        UPDATE plugin_account
+        SET enabled = #{enabled}, updated_at = CURRENT_TIMESTAMP
+        WHERE plugin_id = #{pluginId} AND account_id = #{accountId}
+    </update>
+
+    <delete id="delete">
+        DELETE FROM plugin_account
+        WHERE plugin_id = #{pluginId} AND account_id = #{accountId}
+    </delete>
+
+    <delete id="deleteByPluginId">
+        DELETE FROM plugin_account
+        WHERE plugin_id = #{pluginId}
+    </delete>
+</mapper>

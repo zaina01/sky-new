@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.sky.job.plugin.storage.mapper.PluginTaskLogMapper">
+    <resultMap id="PluginTaskLogResultMap" type="com.sky.job.plugin.storage.PluginTaskLog">
+        <constructor>
+            <arg column="id" javaType="_long"/>
+            <arg column="plugin_id" javaType="java.lang.String"/>
+            <arg column="instance_id" javaType="java.lang.String"/>
+            <arg column="job_id" javaType="java.lang.String"/>
+            <arg column="request_id" javaType="java.lang.String"/>
+            <arg column="level" javaType="java.lang.String"/>
+            <arg column="message" javaType="java.lang.String"/>
+            <arg column="sequence_no" javaType="_long"/>
+            <arg column="event_time" javaType="java.time.LocalDateTime"/>
+            <arg column="created_at" javaType="java.time.LocalDateTime"/>
+        </constructor>
+    </resultMap>
+
+    <insert id="insert">
+        INSERT INTO plugin_task_log (
+          plugin_id, instance_id, job_id, request_id, level, message, sequence_no, event_time
+        ) VALUES (
+          #{pluginId}, #{instanceId}, #{jobId}, #{requestId}, #{level}, #{message}, #{sequenceNo}, #{eventTime}
+        )
+    </insert>
+
+    <select id="listByRequest" resultMap="PluginTaskLogResultMap">
+        SELECT *
+        FROM plugin_task_log
+        WHERE plugin_id = #{pluginId} AND request_id = #{requestId}
+        ORDER BY sequence_no ASC, id ASC
+        LIMIT #{limit} OFFSET #{offset}
+    </select>
+
+    <select id="countByRequest" resultType="long">
+        SELECT COUNT(*)
+        FROM plugin_task_log
+        WHERE plugin_id = #{pluginId} AND request_id = #{requestId}
+    </select>
+
+    <select id="countOlderThan" resultType="long">
+        SELECT COUNT(*)
+        FROM plugin_task_log
+        WHERE event_time &lt; #{cutoff}
+    </select>
+
+    <delete id="deleteOlderThan">
+        DELETE FROM plugin_task_log
+        WHERE event_time &lt; #{cutoff}
+        ORDER BY id
+        LIMIT #{limit}
+    </delete>
+</mapper>

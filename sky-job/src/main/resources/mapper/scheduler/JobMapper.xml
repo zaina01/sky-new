@@ -1,0 +1,95 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.sky.job.scheduler.mapper.JobMapper">
+    <resultMap id="ScheduledJobRowResultMap" type="com.sky.job.scheduler.mapper.ScheduledJobRow">
+        <constructor>
+            <arg column="id" javaType="_long"/>
+            <arg column="job_name" javaType="java.lang.String"/>
+            <arg column="plugin_id" javaType="java.lang.String"/>
+            <arg column="cron_expression" javaType="java.lang.String"/>
+            <arg column="job_status" javaType="java.lang.String"/>
+            <arg column="misfire_policy" javaType="java.lang.String"/>
+            <arg column="concurrent" javaType="_boolean"/>
+            <arg column="input_json" javaType="java.lang.String"/>
+            <arg column="timeout_millis" javaType="_long"/>
+            <arg column="executed_status" javaType="java.lang.String"/>
+            <arg column="remark" javaType="java.lang.String"/>
+            <arg column="created_by" javaType="java.lang.String"/>
+            <arg column="updated_by" javaType="java.lang.String"/>
+            <arg column="created_at" javaType="java.time.LocalDateTime"/>
+            <arg column="updated_at" javaType="java.time.LocalDateTime"/>
+        </constructor>
+    </resultMap>
+
+    <insert id="insert" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO job (
+            job_name, plugin_id, cron_expression, job_status, misfire_policy, concurrent,
+            input_json, timeout_millis, executed_status, remark, created_by, updated_by
+        ) VALUES (
+            #{jobName}, #{pluginId}, #{cronExpression}, #{jobStatus}, #{misfirePolicy}, #{concurrent},
+            CAST(#{inputJson} AS JSON), #{timeoutMillis}, #{executedStatus}, #{remark}, #{actor}, #{actor}
+        )
+    </insert>
+
+    <update id="update">
+        UPDATE job
+        SET job_name = #{jobName}, plugin_id = #{pluginId}, cron_expression = #{cronExpression}, misfire_policy = #{misfirePolicy}, concurrent = #{concurrent},
+            input_json = CAST(#{inputJson} AS JSON), timeout_millis = #{timeoutMillis}, remark = #{remark}, updated_by = #{actor}, updated_at = CURRENT_TIMESTAMP
+        WHERE id = #{id}
+    </update>
+
+    <select id="findById" resultMap="ScheduledJobRowResultMap">SELECT * FROM job WHERE id = #{id}</select>
+
+    <select id="list" resultMap="ScheduledJobRowResultMap">
+        SELECT *
+        FROM job
+        ORDER BY id DESC
+        LIMIT #{limit} OFFSET #{offset}
+    </select>
+
+    <select id="count" resultType="long">SELECT COUNT(*) FROM job</select>
+
+    <select id="countByPluginId" resultType="long">
+        SELECT COUNT(*)
+        FROM job
+        WHERE plugin_id = #{pluginId}
+    </select>
+
+    <select id="countByStatus" resultType="long">
+        SELECT COUNT(*)
+        FROM job
+        WHERE job_status = #{status}
+    </select>
+
+    <delete id="delete">DELETE FROM job WHERE id = #{id}</delete>
+
+    <update id="updateStatus">
+        UPDATE job SET job_status = #{status}, updated_by = #{actor}, updated_at = CURRENT_TIMESTAMP WHERE id = #{id}
+    </update>
+
+    <update id="updateExecutedStatus">
+        UPDATE job SET executed_status = #{status}, updated_at = CURRENT_TIMESTAMP WHERE id = #{id}
+    </update>
+
+    <update id="markRunningIfIdle">
+        UPDATE job
+        SET executed_status = #{runningStatus}, updated_at = CURRENT_TIMESTAMP
+        WHERE id = #{id} AND executed_status = #{idleStatus}
+    </update>
+
+    <update id="markIdleIfRunning">
+        UPDATE job
+        SET executed_status = #{idleStatus}, updated_at = CURRENT_TIMESTAMP
+        WHERE id = #{id} AND executed_status = #{runningStatus}
+    </update>
+
+    <update id="resetRunningToIdle">
+        UPDATE job SET executed_status = #{idleStatus} WHERE executed_status = #{runningStatus}
+    </update>
+
+    <select id="findEnabledJobs" resultMap="ScheduledJobRowResultMap">
+        SELECT * FROM job WHERE job_status = #{enabledStatus} ORDER BY id
+    </select>
+</mapper>

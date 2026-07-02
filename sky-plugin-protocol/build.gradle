@@ -1,0 +1,38 @@
+plugins {
+    id 'java-library'
+    id 'com.google.protobuf'
+    id 'maven-publish'
+}
+
+dependencies {
+    api "io.grpc:grpc-stub:${rootProject.ext.grpcVersion}"
+    api "io.grpc:grpc-protobuf:${rootProject.ext.grpcVersion}"
+    compileOnly 'org.apache.tomcat:annotations-api:6.0.53'
+}
+
+publishing {
+    publications {
+        mavenJava(MavenPublication) {
+            from components.java
+            artifactId = 'sky-plugin-protocol'
+        }
+    }
+}
+
+protobuf {
+    protoc {
+        artifact = "com.google.protobuf:protoc:${rootProject.ext.protobufVersion}"
+    }
+    plugins {
+        grpc {
+            artifact = "io.grpc:protoc-gen-grpc-java:${rootProject.ext.grpcVersion}"
+        }
+    }
+    generateProtoTasks {
+        all().configureEach { task ->
+            task.plugins {
+                grpc {}
+            }
+        }
+    }
+}

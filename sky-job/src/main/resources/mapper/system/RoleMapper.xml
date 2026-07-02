@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.sky.job.system.mapper.RoleMapper">
+    <resultMap id="RoleResultMap" type="com.sky.job.system.Role">
+        <constructor>
+            <arg column="role_id" javaType="java.lang.Long"/>
+            <arg column="role_name" javaType="java.lang.String"/>
+            <arg column="description" javaType="java.lang.String"/>
+            <arg column="created_at" javaType="java.time.LocalDateTime"/>
+        </constructor>
+    </resultMap>
+
+    <sql id="filters">
+        <where>
+            <if test="roleName != null and roleName != ''">
+                role_name LIKE #{roleNameLike}
+            </if>
+        </where>
+    </sql>
+
+    <select id="list" resultMap="RoleResultMap">
+        SELECT *
+        FROM sky_role
+        <include refid="filters"/>
+        ORDER BY role_name ASC
+        LIMIT #{limit} OFFSET #{offset}
+    </select>
+
+    <select id="count" resultType="long">
+        SELECT COUNT(*)
+        FROM sky_role
+        <include refid="filters"/>
+    </select>
+
+    <select id="findById" resultMap="RoleResultMap">SELECT * FROM sky_role WHERE role_id = #{roleId}</select>
+    <select id="findByName" resultMap="RoleResultMap">SELECT * FROM sky_role WHERE role_name = #{roleName}</select>
+    <select id="countByName" resultType="int">SELECT COUNT(*) FROM sky_role WHERE role_name = #{roleName}</select>
+    <select id="countByNameForOtherRole" resultType="int">SELECT COUNT(*) FROM sky_role WHERE role_name = #{roleName} AND role_id &lt;&gt; #{roleId}</select>
+
+    <insert id="insert" useGeneratedKeys="true" keyProperty="roleId">
+        INSERT INTO sky_role (role_name, description) VALUES (#{roleName}, #{description})
+    </insert>
+
+    <update id="update">UPDATE sky_role SET role_name = #{roleName}, description = #{description} WHERE role_id = #{roleId}</update>
+    <delete id="deleteRolePermissions">DELETE FROM sky_role_permission WHERE role_id = #{roleId}</delete>
+    <delete id="delete">DELETE FROM sky_role WHERE role_id = #{roleId}</delete>
+
+    <select id="permissions" resultType="java.lang.String">
+        SELECT p.permission_name
+        FROM sky_permission p
+        JOIN sky_role_permission rp ON rp.permission_id = p.permission_id
+        WHERE rp.role_id = #{roleId}
+    </select>
+
+    <insert id="assignPermission">
+        INSERT INTO sky_role_permission (role_id, permission_id)
+        SELECT #{roleId}, permission_id FROM sky_permission WHERE permission_name = #{permissionName}
+    </insert>
+
+    <select id="countAssigned" resultType="int">SELECT COUNT(*) FROM sky_user_role WHERE role_id = #{roleId}</select>
+</mapper>

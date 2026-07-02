@@ -1,0 +1,40 @@
+package com.sky.job.notification.mapper;
+
+import java.time.LocalDateTime;
+
+public record NotificationSendHistoryRow(
+        long id,
+        String requestId,
+        String sourceType,
+        String pluginId,
+        String instanceId,
+        String jobId,
+        Long executionId,
+        String channelId,
+        String channelType,
+        String title,
+        String severity,
+        String contentPreview,
+        String contentPayload,
+        int payloadBytes,
+        String labelsJson,
+        String status,
+        int attemptCount,
+        int maxAttempts,
+        LocalDateTime nextRetryAt,
+        LocalDateTime firstAttemptAt,
+        LocalDateTime lastAttemptAt,
+        LocalDateTime lockedAt,
+        String lockedBy,
+        int manualRetryCount,
+        LocalDateTime lastManualRetryAt,
+        String lastManualRetryBy,
+        String errorType,
+        String errorMessage,
+        String providerStatusCode,
+        String providerMessage,
+        LocalDateTime createdAt,
+        LocalDateTime sentAt,
+        LocalDateTime updatedAt
+) {
+}

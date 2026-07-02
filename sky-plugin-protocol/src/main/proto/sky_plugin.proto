@@ -1,0 +1,293 @@
+syntax = "proto3";
+
+package sky.plugin.v1;
+
+option java_multiple_files = true;
+option java_package = "com.sky.plugin.protocol";
+option java_outer_classname = "SkyPluginProto";
+
+service PluginRunnerService {
+  rpc Health(HealthRequest) returns (HealthResponse);
+  rpc StartPlugin(StartPluginRequest) returns (StartPluginResponse);
+  rpc RunTask(TaskRunRequest) returns (TaskRunResponse);
+  rpc CallService(PluginServiceRunRequest) returns (PluginServiceRunResponse);
+  rpc CancelTask(CancelTaskRequest) returns (CancelTaskResponse);
+  rpc StopPlugin(StopPluginRequest) returns (StopPluginResponse);
+}
+
+service PluginHostService {
+  rpc OpenLogStream(stream PluginLogEvent) returns (LogStreamResult);
+  rpc WriteLog(PluginLogEvent) returns (Ack);
+  rpc GetConfig(ConfigRequest) returns (ConfigResponse);
+  rpc UpdateConfig(ConfigRequest) returns (ConfigResponse);
+  rpc ListAccounts(AccountRequest) returns (AccountResponse);
+  rpc GetAccount(AccountRequest) returns (AccountResponse);
+  rpc UpdateAccount(AccountRequest) returns (AccountResponse);
+  rpc GetData(PluginDataRequest) returns (PluginDataResponse);
+  rpc PutData(PluginDataRequest) returns (PluginDataResponse);
+  rpc DeleteData(PluginDataRequest) returns (PluginDataResponse);
+  rpc ListData(PluginDataRequest) returns (PluginDataResponse);
+  rpc ListNotificationChannels(NotificationChannelListRequest) returns (NotificationChannelListResponse);
+  rpc SendNotification(NotificationRequest) returns (NotificationResponse);
+  rpc CallPluginService(PluginServiceCallRequest) returns (PluginServiceCallResponse);
+}
+
+message PluginManifestDescriptor {
+  string plugin_id = 1;
+  string version = 2;
+  string display_name = 3;
+  string main_class = 4;
+  PluginCapabilityDescriptor capabilities = 5;
+  PluginConfigSchema config_schema = 6;
+  PluginAccountSchema account_schema = 7;
+}
+
+message PluginCapabilityDescriptor {
+  bool task = 1;
+  bool config = 2;
+  bool account = 3;
+  bool notification = 4;
+  bool service = 5;
+}
+
+message HealthRequest {
+  string plugin_id = 1;
+  string instance_id = 2;
+}
+
+message HealthResponse {
+  bool healthy = 1;
+  string message = 2;
+}
+
+message StartPluginRequest {
+  string plugin_id = 1;
+  string instance_id = 2;
+}
+
+message StartPluginResponse {
+  bool started = 1;
+  string message = 2;
+}
+
+message StopPluginRequest {
+  string plugin_id = 1;
+  string instance_id = 2;
+}
+
+message StopPluginResponse {
+  bool stopped = 1;
+  string message = 2;
+}
+
+message CancelTaskRequest {
+  string request_id = 1;
+  string plugin_id = 2;
+  string job_id = 3;
+}
+
+message CancelTaskResponse {
+  bool cancelled = 1;
+  string message = 2;
+}
+
+message TaskRunRequest {
+  string request_id = 1;
+  string plugin_id = 2;
+  string job_id = 3;
+  string job_name = 4;
+  int64 trigger_time_epoch_millis = 5;
+  int64 timeout_millis = 6;
+  string input_json = 7;
+}
+
+enum TaskRunStatus {
+  TASK_RUN_STATUS_UNSPECIFIED = 0;
+  TASK_RUN_STATUS_SUCCESS = 1;
+  TASK_RUN_STATUS_FAILED = 2;
+  TASK_RUN_STATUS_TIMEOUT = 3;
+  TASK_RUN_STATUS_CANCELLED = 4;
+}
+
+message TaskRunResponse {
+  string request_id = 1;
+  TaskRunStatus status = 2;
+  string message = 3;
+  string result_json = 4;
+  int64 started_at_epoch_millis = 5;
+  int64 finished_at_epoch_millis = 6;
+  string error_type = 7;
+  string error_message = 8;
+}
+
+message PluginServiceCallRequest {
+  string caller_plugin_id = 1;
+  string target_plugin_id = 2;
+  string operation = 3;
+  string request_json = 4;
+  string job_id = 5;
+  string request_id = 6;
+  int64 timeout_millis = 7;
+}
+
+message PluginServiceCallResponse {
+  bool success = 1;
+  string result_json = 2;
+  string message = 3;
+  string error_type = 4;
+  string error_message = 5;
+}
+
+message PluginServiceRunRequest {
+  string request_id = 1;
+  string caller_plugin_id = 2;
+  string target_plugin_id = 3;
+  string operation = 4;
+  string request_json = 5;
+  int64 timeout_millis = 6;
+}
+
+message PluginServiceRunResponse {
+  bool success = 1;
+  string result_json = 2;
+  string message = 3;
+  string error_type = 4;
+  string error_message = 5;
+  int64 started_at_epoch_millis = 6;
+  int64 finished_at_epoch_millis = 7;
+}
+
+message PluginLogEvent {
+  string plugin_id = 1;
+  string instance_id = 2;
+  string job_id = 3;
+  string request_id = 4;
+  LogLevel level = 5;
+  string message = 6;
+  int64 timestamp_epoch_millis = 7;
+  int64 sequence = 8;
+}
+
+enum LogLevel {
+  LOG_LEVEL_UNSPECIFIED = 0;
+  LOG_LEVEL_DEBUG = 1;
+  LOG_LEVEL_INFO = 2;
+  LOG_LEVEL_WARN = 3;
+  LOG_LEVEL_ERROR = 4;
+}
+
+message LogStreamResult {
+  bool accepted = 1;
+  string message = 2;
+}
+
+message PluginConfigSchema {
+  repeated SchemaField fields = 1;
+}
+
+message PluginAccountSchema {
+  repeated SchemaField fields = 1;
+}
+
+message SchemaField {
+  string name = 1;
+  string label = 2;
+  string type = 3;
+  bool required = 4;
+  bool secret = 5;
+}
+
+message ConfigRequest {
+  string plugin_id = 1;
+  string config_json = 2;
+}
+
+message ConfigResponse {
+  bool success = 1;
+  string config_json = 2;
+  string message = 3;
+}
+
+message AccountRequest {
+  string plugin_id = 1;
+  string account_id = 2;
+  string account_json = 3;
+}
+
+message AccountResponse {
+  bool success = 1;
+  repeated AccountRecord accounts = 2;
+  string message = 3;
+}
+
+message AccountRecord {
+  string account_id = 1;
+  string display_name = 2;
+  string account_json = 3;
+  bool enabled = 4;
+}
+
+message PluginDataRequest {
+  string plugin_id = 1;
+  string collection = 2;
+  string key = 3;
+  string data_json = 4;
+}
+
+message PluginDataResponse {
+  bool success = 1;
+  string data_json = 2;
+  repeated PluginDataRecord records = 3;
+  bool deleted = 4;
+  string message = 5;
+}
+
+message PluginDataRecord {
+  string key = 1;
+  string data_json = 2;
+}
+
+message NotificationChannelListRequest {
+  string plugin_id = 1;
+}
+
+message NotificationChannelListResponse {
+  repeated NotificationChannelInfo channels = 1;
+}
+
+message NotificationChannelInfo {
+  string channel_id = 1;
+  string channel_type = 2;
+  string display_name = 3;
+  bool enabled = 4;
+}
+
+message NotificationRequest {
+  string plugin_id = 1;
+  string instance_id = 2;
+  string job_id = 3;
+  string request_id = 4;
+  repeated string channel_ids = 5;
+  string title = 6;
+  string content = 7;
+  string severity = 8;
+  map<string, string> labels = 9;
+}
+
+message NotificationResponse {
+  bool success = 1;
+  string message = 2;
+  repeated NotificationSendReceipt receipts = 3;
+}
+
+message NotificationSendReceipt {
+  string channel_id = 1;
+  string status = 2;
+  string message = 3;
+  int64 history_id = 4;
+}
+
+message Ack {
+  bool success = 1;
+  string message = 2;
+}

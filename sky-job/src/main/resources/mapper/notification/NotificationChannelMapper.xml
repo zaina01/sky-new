@@ -1,0 +1,92 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.sky.job.notification.mapper.NotificationChannelMapper">
+    <resultMap id="NotificationChannelRowResultMap" type="com.sky.job.notification.mapper.NotificationChannelRow">
+        <constructor>
+            <arg column="id" javaType="_long"/>
+            <arg column="channel_id" javaType="java.lang.String"/>
+            <arg column="channel_type" javaType="java.lang.String"/>
+            <arg column="display_name" javaType="java.lang.String"/>
+            <arg column="enabled" javaType="_boolean"/>
+            <arg column="config_json" javaType="java.lang.String"/>
+            <arg column="remark" javaType="java.lang.String"/>
+            <arg column="created_by" javaType="java.lang.String"/>
+            <arg column="updated_by" javaType="java.lang.String"/>
+            <arg column="created_at" javaType="java.time.LocalDateTime"/>
+            <arg column="updated_at" javaType="java.time.LocalDateTime"/>
+        </constructor>
+    </resultMap>
+
+    <sql id="filters">
+        <where>
+            <if test="channelType != null">
+                channel_type = #{channelType}
+            </if>
+            <if test="enabled != null">
+                AND enabled = #{enabled}
+            </if>
+            <if test="channelId != null and channelId != ''">
+                AND channel_id = #{channelId}
+            </if>
+            <if test="displayName != null and displayName != ''">
+                AND display_name LIKE #{displayNameLike}
+            </if>
+        </where>
+    </sql>
+
+    <select id="list" resultMap="NotificationChannelRowResultMap">
+        SELECT *
+        FROM notification_channel
+        <include refid="filters"/>
+        ORDER BY id DESC
+        LIMIT #{limit} OFFSET #{offset}
+    </select>
+
+    <select id="count" resultType="long">
+        SELECT COUNT(*)
+        FROM notification_channel
+        <include refid="filters"/>
+    </select>
+
+    <select id="findByChannelId" resultMap="NotificationChannelRowResultMap">
+        SELECT * FROM notification_channel WHERE channel_id = #{channelId}
+    </select>
+
+    <insert id="insert">
+        INSERT INTO notification_channel (channel_id, channel_type, display_name, enabled, config_json, remark, created_by, updated_by)
+        VALUES (#{channelId}, #{channelType}, #{displayName}, #{enabled}, CAST(#{configJson} AS JSON), #{remark}, #{createdBy}, #{createdBy})
+    </insert>
+
+    <update id="update">
+        UPDATE notification_channel
+        SET channel_type = #{channelType}, display_name = #{displayName}, enabled = #{enabled}, config_json = CAST(#{configJson} AS JSON), remark = #{remark}, updated_by = #{updatedBy}, updated_at = CURRENT_TIMESTAMP
+        WHERE channel_id = #{channelId}
+    </update>
+
+    <update id="updateEnabled">
+        UPDATE notification_channel
+        SET enabled = #{enabled}, updated_by = #{updatedBy}, updated_at = CURRENT_TIMESTAMP
+        WHERE channel_id = #{channelId}
+    </update>
+
+    <delete id="delete">DELETE FROM notification_channel WHERE channel_id = #{channelId}</delete>
+
+    <select id="listEnabled" resultMap="NotificationChannelRowResultMap">
+        SELECT *
+        FROM notification_channel
+        WHERE enabled = TRUE
+        ORDER BY channel_id
+    </select>
+
+    <select id="listEnabledByIds" resultMap="NotificationChannelRowResultMap">
+        SELECT *
+        FROM notification_channel
+        WHERE enabled = TRUE AND channel_id IN
+        <foreach collection="channelIds" item="channelId" open="(" separator="," close=")">
+            #{channelId}
+        </foreach>
+        ORDER BY channel_id
+    </select>
+</mapper>

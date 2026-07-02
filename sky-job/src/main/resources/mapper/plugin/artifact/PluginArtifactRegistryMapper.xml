@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.sky.job.plugin.artifact.mapper.PluginArtifactRegistryMapper">
+    <insert id="upsertRuntime">
+        INSERT INTO plugin_runtime (
+            plugin_id, instance_id, version, display_name, main_class, artifact_path, artifact_sha256,
+            runtime_type, state, capabilities_json, config_schema_json, account_schema_json, dependency_jars_json
+        ) VALUES (
+            #{pluginId}, #{instanceId}, #{version}, #{displayName}, #{mainClass}, #{artifactPath}, #{artifactSha256},
+            'process', 'STOPPED', CAST(#{capabilitiesJson} AS JSON), CAST(#{configSchemaJson} AS JSON), CAST(#{accountSchemaJson} AS JSON), CAST(#{dependencyJarsJson} AS JSON)
+        )
+        ON DUPLICATE KEY UPDATE
+            instance_id = VALUES(instance_id), version = VALUES(version), display_name = VALUES(display_name),
+            main_class = VALUES(main_class), artifact_path = VALUES(artifact_path), artifact_sha256 = VALUES(artifact_sha256),
+            runtime_type = VALUES(runtime_type), state = 'STOPPED', runner_port = NULL, started_at = NULL, capabilities_json = VALUES(capabilities_json),
+            config_schema_json = VALUES(config_schema_json), account_schema_json = VALUES(account_schema_json),
+            dependency_jars_json = CASE WHEN #{overwriteDependencies} THEN VALUES(dependency_jars_json) ELSE dependency_jars_json END
+    </insert>
+
+    <update id="updateDependencyJars">
+        UPDATE plugin_runtime
+        SET dependency_jars_json = CAST(#{dependencyJarsJson} AS JSON), updated_at = CURRENT_TIMESTAMP
+        WHERE plugin_id = #{pluginId}
+    </update>
+</mapper>

@@ -1,0 +1,81 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.sky.job.plugin.artifact.mapper.LocalPluginDependencyArtifactMapper">
+    <resultMap id="LocalPluginDependencyArtifactMap" type="com.sky.job.plugin.artifact.dependency.LocalPluginDependencyArtifact">
+        <constructor>
+            <idArg column="id" javaType="_long"/>
+            <arg column="group_id" javaType="string"/>
+            <arg column="artifact_id" javaType="string"/>
+            <arg column="version" javaType="string"/>
+            <arg column="classifier" javaType="string"/>
+            <arg column="extension" javaType="string"/>
+            <arg column="coordinate" javaType="string"/>
+            <arg column="relative_path" javaType="string"/>
+            <arg column="sha256" javaType="string"/>
+            <arg column="original_filename" javaType="string"/>
+            <arg column="size_bytes" javaType="_long"/>
+            <arg column="uploaded_by" javaType="string"/>
+            <arg column="created_at" javaType="java.time.LocalDateTime"/>
+            <arg column="updated_at" javaType="java.time.LocalDateTime"/>
+        </constructor>
+    </resultMap>
+
+    <sql id="keywordFilter">
+        <if test="keyword != null and keyword != ''">
+            AND (
+                group_id LIKE CONCAT('%', #{keyword}, '%')
+                OR artifact_id LIKE CONCAT('%', #{keyword}, '%')
+                OR version LIKE CONCAT('%', #{keyword}, '%')
+                OR coordinate LIKE CONCAT('%', #{keyword}, '%')
+            )
+        </if>
+    </sql>
+
+    <insert id="upsert">
+        INSERT INTO plugin_local_dependency_artifact (
+            group_id, artifact_id, version, classifier, extension, coordinate, relative_path,
+            sha256, original_filename, size_bytes, uploaded_by
+        ) VALUES (
+            #{groupId}, #{artifactId}, #{version}, #{classifier}, #{extension}, #{coordinate}, #{relativePath},
+            #{sha256}, #{originalFilename}, #{sizeBytes}, #{uploadedBy}
+        )
+        ON DUPLICATE KEY UPDATE
+            coordinate = VALUES(coordinate),
+            relative_path = VALUES(relative_path),
+            sha256 = VALUES(sha256),
+            original_filename = VALUES(original_filename),
+            size_bytes = VALUES(size_bytes),
+            uploaded_by = VALUES(uploaded_by),
+            updated_at = CURRENT_TIMESTAMP
+    </insert>
+
+    <select id="findByCoordinate" resultMap="LocalPluginDependencyArtifactMap">
+        SELECT id, group_id, artifact_id, version, classifier, extension, coordinate, relative_path,
+               sha256, original_filename, size_bytes, uploaded_by, created_at, updated_at
+        FROM plugin_local_dependency_artifact
+        WHERE group_id = #{groupId}
+          AND artifact_id = #{artifactId}
+          AND version = #{version}
+          AND classifier = #{classifier}
+          AND extension = #{extension}
+    </select>
+
+    <select id="list" resultMap="LocalPluginDependencyArtifactMap">
+        SELECT id, group_id, artifact_id, version, classifier, extension, coordinate, relative_path,
+               sha256, original_filename, size_bytes, uploaded_by, created_at, updated_at
+        FROM plugin_local_dependency_artifact
+        WHERE 1 = 1
+        <include refid="keywordFilter"/>
+        ORDER BY updated_at DESC, id DESC
+        LIMIT #{limit} OFFSET #{offset}
+    </select>
+
+    <select id="count" resultType="long">
+        SELECT COUNT(*)
+        FROM plugin_local_dependency_artifact
+        WHERE 1 = 1
+        <include refid="keywordFilter"/>
+    </select>
+</mapper>

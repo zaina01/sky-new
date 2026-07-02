@@ -1,0 +1,112 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.sky.job.scheduler.mapper.JobExecutionMapper">
+    <resultMap id="JobExecutionRowResultMap" type="com.sky.job.scheduler.mapper.JobExecutionRow">
+        <constructor>
+            <arg column="id" javaType="_long"/>
+            <arg column="job_id" javaType="_long"/>
+            <arg column="plugin_id" javaType="java.lang.String"/>
+            <arg column="instance_id" javaType="java.lang.String"/>
+            <arg column="request_id" javaType="java.lang.String"/>
+            <arg column="status" javaType="java.lang.String"/>
+            <arg column="trigger_type" javaType="java.lang.String"/>
+            <arg column="job_name" javaType="java.lang.String"/>
+            <arg column="started_at" javaType="java.time.LocalDateTime"/>
+            <arg column="finished_at" javaType="java.time.LocalDateTime"/>
+            <arg column="duration_millis" javaType="java.lang.Long"/>
+            <arg column="message" javaType="java.lang.String"/>
+            <arg column="result_json" javaType="java.lang.String"/>
+            <arg column="error_type" javaType="java.lang.String"/>
+            <arg column="error_message" javaType="java.lang.String"/>
+            <arg column="runner_log_path" javaType="java.lang.String"/>
+            <arg column="created_at" javaType="java.time.LocalDateTime"/>
+        </constructor>
+    </resultMap>
+
+    <insert id="insertRunning" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO job_execution (job_id, plugin_id, instance_id, status, trigger_type, job_name, runner_log_path)
+        VALUES (#{jobId}, #{pluginId}, #{instanceId}, #{status}, #{triggerType}, #{jobName}, #{runnerLogPath})
+    </insert>
+
+    <update id="updateRequestId">UPDATE job_execution SET request_id = #{requestId} WHERE id = #{id}</update>
+
+    <update id="markTerminal">
+        UPDATE job_execution
+        SET status = #{status}, message = #{message}, result_json = CAST(#{resultJson} AS JSON), error_type = #{errorType}, error_message = #{errorMessage}, finished_at = #{finishedAt}, duration_millis = #{durationMillis}
+        WHERE id = #{id}
+    </update>
+
+    <update id="markTerminalIfRunning">
+        UPDATE job_execution
+        SET status = #{status}, message = #{message}, result_json = CAST(#{resultJson} AS JSON), error_type = #{errorType}, error_message = #{errorMessage}, finished_at = #{finishedAt}, duration_millis = #{durationMillis}
+        WHERE id = #{id} AND status = #{runningStatus}
+    </update>
+
+    <update id="markCancelledIfRunning">
+        UPDATE job_execution
+        SET status = #{cancelledStatus}, message = #{message}, result_json = CAST('{}' AS JSON), error_type = #{errorType}, error_message = NULL, finished_at = #{finishedAt}, duration_millis = #{durationMillis}
+        WHERE id = #{id} AND status = #{runningStatus}
+    </update>
+
+    <update id="markSystemExitForRunning">
+        UPDATE job_execution
+        SET status = #{systemExitStatus}, finished_at = CURRENT_TIMESTAMP(3), message = 'Host restarted while job was running'
+        WHERE status = #{runningStatus}
+    </update>
+
+    <select id="countOlderThan" resultType="long">
+        SELECT COUNT(*)
+        FROM job_execution
+        WHERE finished_at &lt; #{cutoff} AND status &lt;&gt; #{runningStatus}
+    </select>
+
+    <delete id="deleteOlderThan">
+        DELETE FROM job_execution
+        WHERE finished_at &lt; #{cutoff} AND status &lt;&gt; #{runningStatus}
+        ORDER BY id
+        LIMIT #{limit}
+    </delete>
+
+    <select id="countRunningByJobId" resultType="int">
+        SELECT COUNT(*)
+        FROM job_execution
+        WHERE job_id = #{jobId} AND status = #{runningStatus}
+    </select>
+
+    <delete id="deleteByJobId">
+        DELETE FROM job_execution
+        WHERE job_id = #{jobId}
+    </delete>
+
+    <select id="findById" resultMap="JobExecutionRowResultMap">SELECT * FROM job_execution WHERE id = #{id}</select>
+
+    <sql id="filters">
+        <where>
+            <if test="jobId != null">
+                job_id = #{jobId}
+            </if>
+            <if test="pluginId != null and pluginId != ''">
+                AND plugin_id = #{pluginId}
+            </if>
+            <if test="status != null">
+                AND status = #{status}
+            </if>
+        </where>
+    </sql>
+
+    <select id="list" resultMap="JobExecutionRowResultMap">
+        SELECT *
+        FROM job_execution
+        <include refid="filters"/>
+        ORDER BY id DESC
+        LIMIT #{limit} OFFSET #{offset}
+    </select>
+
+    <select id="count" resultType="long">
+        SELECT COUNT(*)
+        FROM job_execution
+        <include refid="filters"/>
+    </select>
+</mapper>
