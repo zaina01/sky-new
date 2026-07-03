@@ -1,5 +1,7 @@
 package com.sky.job.scheduler;
 
+import com.sky.job.common.mapper.DailyStatusCountRow;
+import com.sky.job.common.mapper.StatusCountRow;
 import com.sky.job.scheduler.mapper.JobExecutionMapper;
 import com.sky.job.scheduler.mapper.JobExecutionRow;
 import org.springframework.stereotype.Repository;
@@ -83,6 +85,18 @@ public class JobExecutionStore {
 
     public long count(Long jobId, String pluginId, JobExecutionStatus status) {
         return mapper.count(jobId, trim(pluginId), status == null ? null : status.name());
+    }
+
+    public List<StatusCountRow> countByStatusBetween(LocalDateTime startTime, LocalDateTime endTime) {
+        return mapper.countByStatusBetween(startTime, endTime);
+    }
+
+    public List<DailyStatusCountRow> countDailyByStatus(LocalDateTime startTime, LocalDateTime endTime) {
+        return mapper.countDailyByStatus(startTime, endTime);
+    }
+
+    public List<JobExecution> listRecentFailures(List<JobExecutionStatus> statuses, int limit) {
+        return mapper.listRecentFailures(statuses.stream().map(Enum::name).toList(), limit).stream().map(this::map).toList();
     }
 
     private JobExecution map(JobExecutionRow row) {

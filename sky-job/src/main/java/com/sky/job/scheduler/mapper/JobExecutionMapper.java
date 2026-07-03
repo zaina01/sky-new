@@ -1,5 +1,7 @@
 package com.sky.job.scheduler.mapper;
 
+import com.sky.job.common.mapper.DailyStatusCountRow;
+import com.sky.job.common.mapper.StatusCountRow;
 import org.apache.ibatis.annotations.Param;
 
 import java.time.LocalDateTime;
@@ -65,4 +67,10 @@ public interface JobExecutionMapper {
     );
 
     long count(@Param("jobId") Long jobId, @Param("pluginId") String pluginId, @Param("status") String status);
+
+    List<StatusCountRow> countByStatusBetween(@Param("startTime") LocalDateTime startTime, @Param("endTime") LocalDateTime endTime);
+
+    List<DailyStatusCountRow> countDailyByStatus(@Param("startTime") LocalDateTime startTime, @Param("endTime") LocalDateTime endTime);
+
+    List<JobExecutionRow> listRecentFailures(@Param("statuses") List<String> statuses, @Param("limit") int limit);
 }

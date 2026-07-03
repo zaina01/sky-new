@@ -1,5 +1,7 @@
 package com.sky.job.notification.mapper;
 
+import com.sky.job.common.mapper.DailyStatusCountRow;
+import com.sky.job.common.mapper.StatusCountRow;
 import org.apache.ibatis.annotations.Param;
 
 import java.time.LocalDateTime;
@@ -99,6 +101,12 @@ public interface NotificationSendHistoryMapper {
     NotificationSendHistoryRow findById(@Param("id") long id);
 
     long countOlderThan(@Param("cutoff") LocalDateTime cutoff);
+
+    List<StatusCountRow> countByStatusBetween(@Param("startTime") LocalDateTime startTime, @Param("endTime") LocalDateTime endTime);
+
+    List<DailyStatusCountRow> countDailyByStatus(@Param("startTime") LocalDateTime startTime, @Param("endTime") LocalDateTime endTime);
+
+    List<NotificationSendHistoryRow> listRecentFailures(@Param("failedStatus") String failedStatus, @Param("limit") int limit);
 
     int deleteOlderThan(@Param("cutoff") LocalDateTime cutoff, @Param("limit") int limit);
 }

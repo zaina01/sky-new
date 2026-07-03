@@ -81,6 +81,7 @@ INSERT IGNORE INTO sky_permission (permission_name, description) VALUES
   ('system:role:write', 'Create and update system roles'),
   ('system:role:delete', 'Delete system roles'),
   ('system:permission:read', 'Read system permissions'),
+  ('system:overview:read', 'Read system overview dashboard'),
   ('system:login-log:read', 'Read system login logs'),
   ('system:log:read', 'Read system operation logs'),
   ('system:retention:cleanup', 'Run retention cleanup'),
@@ -363,6 +364,7 @@ CREATE TABLE IF NOT EXISTS job (
   PRIMARY KEY (id),
   KEY idx_job_plugin (plugin_id),
   KEY idx_job_status (job_status),
+  KEY idx_job_executed_status (executed_status),
   CONSTRAINT fk_job_plugin_runtime FOREIGN KEY (plugin_id) REFERENCES plugin_runtime (plugin_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
@@ -388,6 +390,7 @@ CREATE TABLE IF NOT EXISTS job_execution (
   KEY idx_job_execution_job (job_id, started_at),
   KEY idx_job_execution_plugin (plugin_id, started_at),
   KEY idx_job_execution_status (status, started_at),
+  KEY idx_job_execution_started_status (started_at, status),
   KEY idx_job_execution_request (plugin_id, request_id),
   KEY idx_job_execution_finished (finished_at),
   CONSTRAINT fk_job_execution_job FOREIGN KEY (job_id) REFERENCES job (id)

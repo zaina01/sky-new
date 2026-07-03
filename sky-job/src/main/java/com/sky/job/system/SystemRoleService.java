@@ -25,6 +25,7 @@ public class SystemRoleService {
             PermissionNames.SYSTEM_ROLE_WRITE,
             PermissionNames.SYSTEM_ROLE_DELETE,
             PermissionNames.SYSTEM_PERMISSION_READ,
+            PermissionNames.SYSTEM_OVERVIEW_READ,
             PermissionNames.SYSTEM_SETTING_READ,
             PermissionNames.SYSTEM_SETTING_WRITE
     );

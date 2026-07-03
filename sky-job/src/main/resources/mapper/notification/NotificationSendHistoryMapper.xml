@@ -3,6 +3,21 @@
         PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="com.sky.job.notification.mapper.NotificationSendHistoryMapper">
+    <resultMap id="StatusCountRowResultMap" type="com.sky.job.common.mapper.StatusCountRow">
+        <constructor>
+            <arg column="status" javaType="java.lang.String"/>
+            <arg column="total" javaType="_long"/>
+        </constructor>
+    </resultMap>
+
+    <resultMap id="DailyStatusCountRowResultMap" type="com.sky.job.common.mapper.DailyStatusCountRow">
+        <constructor>
+            <arg column="bucket_date" javaType="java.time.LocalDate"/>
+            <arg column="status" javaType="java.lang.String"/>
+            <arg column="total" javaType="_long"/>
+        </constructor>
+    </resultMap>
+
     <resultMap id="NotificationSendHistoryRowResultMap" type="com.sky.job.notification.mapper.NotificationSendHistoryRow">
         <constructor>
             <arg column="id" javaType="_long"/>
@@ -159,6 +174,29 @@
 
     <select id="countOlderThan" resultType="long">
         SELECT COUNT(*) FROM notification_send_history WHERE created_at &lt; #{cutoff}
+    </select>
+
+    <select id="countByStatusBetween" resultMap="StatusCountRowResultMap">
+        SELECT status AS status, COUNT(*) AS total
+        FROM notification_send_history
+        WHERE created_at &gt;= #{startTime} AND created_at &lt; #{endTime}
+        GROUP BY status
+    </select>
+
+    <select id="countDailyByStatus" resultMap="DailyStatusCountRowResultMap">
+        SELECT DATE(created_at) AS bucket_date, status AS status, COUNT(*) AS total
+        FROM notification_send_history
+        WHERE created_at &gt;= #{startTime} AND created_at &lt; #{endTime}
+        GROUP BY DATE(created_at), status
+        ORDER BY bucket_date ASC, status ASC
+    </select>
+
+    <select id="listRecentFailures" resultMap="NotificationSendHistoryRowResultMap">
+        SELECT *
+        FROM notification_send_history
+        WHERE status = #{failedStatus}
+        ORDER BY created_at DESC, id DESC
+        LIMIT #{limit}
     </select>
 
     <delete id="deleteOlderThan">

@@ -1,5 +1,7 @@
 package com.sky.job.notification;
 
+import com.sky.job.common.mapper.DailyStatusCountRow;
+import com.sky.job.common.mapper.StatusCountRow;
 import com.sky.job.notification.mapper.NotificationSendHistoryMapper;
 import com.sky.job.notification.mapper.NotificationSendHistoryRow;
 import org.springframework.stereotype.Repository;
@@ -137,6 +139,18 @@ public class NotificationSendHistoryStore {
 
     public Optional<NotificationSendHistory> findById(long id) {
         return Optional.ofNullable(mapper.findById(id)).map(this::map);
+    }
+
+    public List<StatusCountRow> countByStatusBetween(LocalDateTime startTime, LocalDateTime endTime) {
+        return mapper.countByStatusBetween(startTime, endTime);
+    }
+
+    public List<DailyStatusCountRow> countDailyByStatus(LocalDateTime startTime, LocalDateTime endTime) {
+        return mapper.countDailyByStatus(startTime, endTime);
+    }
+
+    public List<NotificationSendHistory> listRecentFailures(int limit) {
+        return mapper.listRecentFailures(NotificationSendStatus.FAILED.name(), limit).stream().map(this::map).toList();
     }
 
     public long countOlderThan(LocalDateTime cutoff) {

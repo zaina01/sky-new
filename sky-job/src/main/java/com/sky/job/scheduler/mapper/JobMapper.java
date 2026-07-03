@@ -1,5 +1,6 @@
 package com.sky.job.scheduler.mapper;
 
+import com.sky.job.common.mapper.StatusCountRow;
 import org.apache.ibatis.annotations.Param;
 
 import java.util.List;
@@ -30,6 +31,10 @@ public interface JobMapper {
     long countByPluginId(@Param("pluginId") String pluginId);
 
     long countByStatus(@Param("status") String status);
+
+    List<StatusCountRow> countByJobStatus();
+
+    List<StatusCountRow> countByExecutedStatus();
 
     int delete(@Param("id") long id);
 

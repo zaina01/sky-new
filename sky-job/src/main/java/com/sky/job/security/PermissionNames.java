@@ -12,6 +12,7 @@ public final class PermissionNames {
     public static final String SYSTEM_ROLE_WRITE = "system:role:write";
     public static final String SYSTEM_ROLE_DELETE = "system:role:delete";
     public static final String SYSTEM_PERMISSION_READ = "system:permission:read";
+    public static final String SYSTEM_OVERVIEW_READ = "system:overview:read";
     public static final String SYSTEM_LOGIN_LOG_READ = "system:login-log:read";
     public static final String SYSTEM_LOG_READ = "system:log:read";
     public static final String SYSTEM_RETENTION_CLEANUP = "system:retention:cleanup";

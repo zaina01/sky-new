@@ -1,5 +1,6 @@
 package com.sky.job.scheduler.mapper;
 
+import com.sky.job.common.mapper.StatusCountRow;
 import org.apache.ibatis.annotations.Param;
 
 import java.time.LocalDateTime;
@@ -16,6 +17,8 @@ public interface PluginRuntimeMetadataMapper {
     );
 
     long countRuntimes(@Param("pluginId") String pluginId, @Param("state") String state);
+
+    List<StatusCountRow> countRuntimesByState();
 
     List<PluginRuntimeRow> listOptions(
             @Param("keyword") String keyword,

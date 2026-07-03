@@ -3,6 +3,13 @@
         PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="com.sky.job.scheduler.mapper.PluginRuntimeMetadataMapper">
+    <resultMap id="StatusCountRowResultMap" type="com.sky.job.common.mapper.StatusCountRow">
+        <constructor>
+            <arg column="status" javaType="java.lang.String"/>
+            <arg column="total" javaType="_long"/>
+        </constructor>
+    </resultMap>
+
     <resultMap id="PluginRuntimeRowResultMap" type="com.sky.job.scheduler.mapper.PluginRuntimeRow">
         <constructor>
             <arg column="id" javaType="_long"/>
@@ -60,6 +67,12 @@
                 AND state = #{state}
             </if>
         </where>
+    </select>
+
+    <select id="countRuntimesByState" resultMap="StatusCountRowResultMap">
+        SELECT state AS status, COUNT(*) AS total
+        FROM plugin_runtime
+        GROUP BY state
     </select>
 
     <sql id="optionFilters">

@@ -3,6 +3,21 @@
         PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="com.sky.job.scheduler.mapper.JobExecutionMapper">
+    <resultMap id="StatusCountRowResultMap" type="com.sky.job.common.mapper.StatusCountRow">
+        <constructor>
+            <arg column="status" javaType="java.lang.String"/>
+            <arg column="total" javaType="_long"/>
+        </constructor>
+    </resultMap>
+
+    <resultMap id="DailyStatusCountRowResultMap" type="com.sky.job.common.mapper.DailyStatusCountRow">
+        <constructor>
+            <arg column="bucket_date" javaType="java.time.LocalDate"/>
+            <arg column="status" javaType="java.lang.String"/>
+            <arg column="total" javaType="_long"/>
+        </constructor>
+    </resultMap>
+
     <resultMap id="JobExecutionRowResultMap" type="com.sky.job.scheduler.mapper.JobExecutionRow">
         <constructor>
             <arg column="id" javaType="_long"/>
@@ -108,5 +123,31 @@
         SELECT COUNT(*)
         FROM job_execution
         <include refid="filters"/>
+    </select>
+
+    <select id="countByStatusBetween" resultMap="StatusCountRowResultMap">
+        SELECT status AS status, COUNT(*) AS total
+        FROM job_execution
+        WHERE started_at &gt;= #{startTime} AND started_at &lt; #{endTime}
+        GROUP BY status
+    </select>
+
+    <select id="countDailyByStatus" resultMap="DailyStatusCountRowResultMap">
+        SELECT DATE(started_at) AS bucket_date, status AS status, COUNT(*) AS total
+        FROM job_execution
+        WHERE started_at &gt;= #{startTime} AND started_at &lt; #{endTime}
+        GROUP BY DATE(started_at), status
+        ORDER BY bucket_date ASC, status ASC
+    </select>
+
+    <select id="listRecentFailures" resultMap="JobExecutionRowResultMap">
+        SELECT *
+        FROM job_execution
+        WHERE status IN
+        <foreach collection="statuses" item="status" open="(" separator="," close=")">
+            #{status}
+        </foreach>
+        ORDER BY started_at DESC, id DESC
+        LIMIT #{limit}
     </select>
 </mapper>

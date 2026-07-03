@@ -51,7 +51,7 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.PUT, "/system/roles/*").hasAuthority(PermissionNames.SYSTEM_ROLE_WRITE)
                         .requestMatchers(HttpMethod.DELETE, "/system/roles/*").hasAuthority(PermissionNames.SYSTEM_ROLE_DELETE)
                         .requestMatchers(HttpMethod.GET, "/system/permissions", "/system/permissions/**").hasAuthority(PermissionNames.SYSTEM_PERMISSION_READ)
-                        .requestMatchers(HttpMethod.GET, "/system/overview").hasAuthority(PermissionNames.SYSTEM_LOG_READ)
+                        .requestMatchers(HttpMethod.GET, "/system/overview").hasAuthority(PermissionNames.SYSTEM_OVERVIEW_READ)
                         .requestMatchers(HttpMethod.GET, "/system/login-logs", "/system/login-logs/**").hasAuthority(PermissionNames.SYSTEM_LOGIN_LOG_READ)
                         .requestMatchers(HttpMethod.GET, "/system/logs", "/system/logs/**").hasAuthority(PermissionNames.SYSTEM_LOG_READ)
                         .requestMatchers(HttpMethod.POST, "/system/retention-cleanup").hasAuthority(PermissionNames.SYSTEM_RETENTION_CLEANUP)

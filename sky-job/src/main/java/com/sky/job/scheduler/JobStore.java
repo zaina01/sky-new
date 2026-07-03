@@ -1,5 +1,6 @@
 package com.sky.job.scheduler;
 
+import com.sky.job.common.mapper.StatusCountRow;
 import com.sky.job.scheduler.mapper.JobMapper;
 import com.sky.job.scheduler.mapper.ScheduledJobRow;
 import org.springframework.stereotype.Repository;
@@ -62,6 +63,14 @@ public class JobStore {
 
     public long countByStatus(JobStatus status) {
         return mapper.countByStatus(status.name());
+    }
+
+    public List<StatusCountRow> countByJobStatus() {
+        return mapper.countByJobStatus();
+    }
+
+    public List<StatusCountRow> countByExecutedStatus() {
+        return mapper.countByExecutedStatus();
     }
 
     public void delete(long id) {

@@ -2,6 +2,7 @@ package com.sky.job.scheduler;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.sky.job.common.mapper.StatusCountRow;
 import com.sky.job.plugin.artifact.dependency.PluginDependencyResolutionProperties;
 import com.sky.job.plugin.runtime.PluginOptionUsage;
 import com.sky.job.plugin.runtime.PluginRuntimeRecord;
@@ -52,6 +53,10 @@ public class PluginRuntimeMetadataStore {
 
     public long countRuntimes(String pluginId, PluginRuntimeState state) {
         return mapper.countRuntimes(trim(pluginId), state == null ? null : state.name());
+    }
+
+    public List<StatusCountRow> countRuntimesByState() {
+        return mapper.countRuntimesByState();
     }
 
     public List<PluginRuntimeRecord> listOptions(String keyword, PluginRuntimeState state, PluginOptionUsage usage, Integer page, Integer size) {
