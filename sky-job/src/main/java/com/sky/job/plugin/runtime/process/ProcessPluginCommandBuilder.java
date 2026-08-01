@@ -26,6 +26,10 @@ public class ProcessPluginCommandBuilder {
         command.add("-Dorg.slf4j.simpleLogger.showDateTime=true");
         command.add("-Dorg.slf4j.simpleLogger.dateTimeFormat=yyyy-MM-dd HH:mm:ss.SSS");
         command.add("-Xmx" + runtimeSettings.maxHeap());
+        if (spec.remoteDebugEnabled()) {
+            String suspend = spec.remoteDebugSuspend() ? "y" : "n";
+            command.add("-agentlib:jdwp=transport=dt_socket,server=y,suspend=" + suspend + ",address=127.0.0.1:" + spec.remoteDebugPort());
+        }
         command.add("-jar");
         command.add(properties.runnerJar().toAbsolutePath().normalize().toString());
         command.add(spec.artifactPath().toAbsolutePath().normalize().toString());

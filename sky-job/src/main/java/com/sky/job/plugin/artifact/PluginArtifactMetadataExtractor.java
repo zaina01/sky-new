@@ -11,7 +11,6 @@ import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.util.ArrayList;
-import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -326,14 +325,32 @@ public class PluginArtifactMetadataExtractor {
         if (metadata.pluginAccount() == null) {
             throw new IllegalArgumentException("Plugin account class is missing @PluginAccount: " + schemaClass);
         }
-        List<Map<String, Object>> fields = new ArrayList<>();
-        Set<String> names = new HashSet<>();
+        AccountFields accountFields = accountFields(metadata, classes, true, true);
+        Map<String, Object> schema = new LinkedHashMap<>();
+        schema.put("fields", accountFields.fields());
+        if (accountFields.accountIdField() != null) {
+            schema.put("accountIdField", accountFields.accountIdField());
+        }
+        return objectMapper.valueToTree(schema);
+    }
+
+    private AccountFields accountFields(
+            PluginClassMetadataScanner.PluginClassMetadata metadata,
+            Map<String, PluginClassMetadataScanner.PluginClassMetadata> classes,
+            boolean allowObjectList,
+            boolean allowAccountId
+    ) {
+        List<PluginClassMetadataScanner.FieldMetadata> accountFields = new ArrayList<>();
+        Map<String, PluginClassMetadataScanner.AccountFieldMetadata> annotationsByName = new LinkedHashMap<>();
         String accountIdField = null;
         for (PluginClassMetadataScanner.FieldMetadata field : metadata.fields()) {
             PluginClassMetadataScanner.AccountFieldMetadata annotation = field.accountField();
             boolean accountId = field.accountId();
             if (annotation == null && !accountId) {
                 continue;
+            }
+            if (accountId && !allowAccountId) {
+                throw new IllegalArgumentException("Plugin OBJECT_LIST account item field cannot declare @AccountId: " + field.name());
             }
             if (annotation == null) {
                 throw new IllegalArgumentException("@AccountId field must also declare @AccountField: " + field.name());
@@ -348,9 +365,16 @@ public class PluginArtifactMetadataExtractor {
                 accountIdField = field.name();
             }
             String name = field.name();
-            if (!names.add(name)) {
+            if (annotationsByName.put(name, annotation) != null) {
                 throw new IllegalArgumentException("Duplicate plugin account field: " + name);
             }
+            accountFields.add(field);
+        }
+        List<Map<String, Object>> fields = new ArrayList<>();
+        for (PluginClassMetadataScanner.FieldMetadata field : accountFields) {
+            PluginClassMetadataScanner.AccountFieldMetadata annotation = field.accountField();
+            boolean accountId = field.accountId();
+            String name = field.name();
             Map<String, Object> value = new LinkedHashMap<>();
             value.put("name", name);
             value.put("label", annotation.label());
@@ -360,13 +384,102 @@ public class PluginArtifactMetadataExtractor {
             value.put("readonly", annotation.readonly());
             value.put("accountId", accountId);
             value.put("options", annotation.options());
+            Map<String, Object> visibleWhen = accountVisibleWhen(name, annotation, annotationsByName);
+            if (!visibleWhen.isEmpty()) {
+                value.put("visibleWhen", visibleWhen);
+            }
+            if ("OBJECT_LIST".equals(annotation.type())) {
+                value.put("itemSchema", accountObjectListItemSchema(name, annotation, classes, allowObjectList));
+            } else if (!PluginClassMetadataScanner.VOID_CLASS_NAME.equals(annotation.itemClass())) {
+                throw new IllegalArgumentException("Plugin account itemClass can only be used with OBJECT_LIST: " + name);
+            }
             fields.add(value);
         }
-        Map<String, Object> schema = new LinkedHashMap<>();
-        schema.put("fields", fields);
-        if (accountIdField != null) {
-            schema.put("accountIdField", accountIdField);
+        return new AccountFields(List.copyOf(fields), accountIdField);
+    }
+
+    private Map<String, Object> accountObjectListItemSchema(
+            String fieldName,
+            PluginClassMetadataScanner.AccountFieldMetadata annotation,
+            Map<String, PluginClassMetadataScanner.PluginClassMetadata> classes,
+            boolean allowObjectList
+    ) {
+        if (!allowObjectList) {
+            throw new IllegalArgumentException("Nested OBJECT_LIST account field is not supported: " + fieldName);
         }
-        return objectMapper.valueToTree(schema);
+        if (!annotation.options().isEmpty()) {
+            throw new IllegalArgumentException("Plugin OBJECT_LIST account field must not declare options: " + fieldName);
+        }
+        if (PluginClassMetadataScanner.VOID_CLASS_NAME.equals(annotation.itemClass())) {
+            throw new IllegalArgumentException("Plugin OBJECT_LIST account field must declare itemClass: " + fieldName);
+        }
+        PluginClassMetadataScanner.PluginClassMetadata itemMetadata = classes.get(annotation.itemClass());
+        if (itemMetadata == null) {
+            throw new IllegalArgumentException("Plugin OBJECT_LIST account item class not found in artifact: " + annotation.itemClass());
+        }
+        AccountFields itemFields = accountFields(itemMetadata, classes, false, false);
+        if (itemFields.fields().isEmpty()) {
+            throw new IllegalArgumentException("Plugin OBJECT_LIST item class must declare account fields: " + annotation.itemClass());
+        }
+        Map<String, Object> itemSchema = new LinkedHashMap<>();
+        itemSchema.put("fields", itemFields.fields());
+        return itemSchema;
+    }
+
+    private Map<String, Object> accountVisibleWhen(
+            String fieldName,
+            PluginClassMetadataScanner.AccountFieldMetadata annotation,
+            Map<String, PluginClassMetadataScanner.AccountFieldMetadata> annotationsByName
+    ) {
+        String controlField = trim(annotation.visibleWhenField());
+        String equals = trim(annotation.visibleWhenEquals());
+        List<String> in = annotation.visibleWhenIn().stream().map(this::trim).filter(value -> value != null).toList();
+        if (controlField == null && equals == null && in.isEmpty()) {
+            return Map.of();
+        }
+        if (controlField == null) {
+            throw new IllegalArgumentException("Plugin account visibleWhen field is required: " + fieldName);
+        }
+        if (equals != null && !in.isEmpty()) {
+            throw new IllegalArgumentException("Plugin account visibleWhen must use either equals or in: " + fieldName);
+        }
+        if (equals == null && in.isEmpty()) {
+            throw new IllegalArgumentException("Plugin account visibleWhen condition is required: " + fieldName);
+        }
+        PluginClassMetadataScanner.AccountFieldMetadata controlAnnotation = annotationsByName.get(controlField);
+        if (controlAnnotation == null) {
+            throw new IllegalArgumentException("Plugin account visibleWhen references unknown field: " + controlField);
+        }
+        if (fieldName.equals(controlField)) {
+            throw new IllegalArgumentException("Plugin account field cannot depend on itself: " + fieldName);
+        }
+        Map<String, Object> visibleWhen = new LinkedHashMap<>();
+        visibleWhen.put("field", controlField);
+        if (equals != null) {
+            visibleWhen.put("equals", accountVisibleWhenValue(fieldName, controlAnnotation, equals));
+        } else {
+            visibleWhen.put("in", in.stream().map(value -> accountVisibleWhenValue(fieldName, controlAnnotation, value)).toList());
+        }
+        return visibleWhen;
+    }
+
+    private Object accountVisibleWhenValue(
+            String fieldName,
+            PluginClassMetadataScanner.AccountFieldMetadata controlAnnotation,
+            String value
+    ) {
+        if ("SWITCH".equals(controlAnnotation.type())) {
+            if ("true".equalsIgnoreCase(value)) {
+                return true;
+            }
+            if ("false".equalsIgnoreCase(value)) {
+                return false;
+            }
+            throw new IllegalArgumentException("Plugin account SWITCH visibleWhen value must be true or false: " + fieldName);
+        }
+        return value;
+    }
+
+    private record AccountFields(List<Map<String, Object>> fields, String accountIdField) {
     }
 }

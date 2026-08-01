@@ -1,6 +1,7 @@
 package com.sky.job.plugin.runtime;
 
 import com.sky.job.plugin.runtime.dto.PluginRuntimeResponse;
+import com.sky.job.plugin.runtime.dto.UpdatePluginRuntimeDebugRequest;
 import com.sky.job.scheduler.dto.PageResponse;
 import com.sky.job.security.AuthenticatedUser;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -8,6 +9,8 @@ import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -51,6 +54,15 @@ public class PluginRuntimeController {
     @PostMapping("/{pluginId}/restart")
     public PluginRuntimeResponse restart(@PathVariable String pluginId, @AuthenticationPrincipal AuthenticatedUser user) {
         return runtimeService.restart(pluginId, user.username());
+    }
+
+    @PutMapping("/{pluginId}/debug")
+    public PluginRuntimeResponse updateDebug(
+            @PathVariable String pluginId,
+            @RequestBody(required = false) UpdatePluginRuntimeDebugRequest request,
+            @AuthenticationPrincipal AuthenticatedUser user
+    ) {
+        return runtimeService.updateDebug(pluginId, request, user.username());
     }
 
     @DeleteMapping("/{pluginId}")

@@ -134,6 +134,9 @@ public class JobExecutionService {
                     hostGrpcPort,
                     metadata.dependencyPaths(),
                     metadata.capabilities(),
+                    metadata.remoteDebugEnabled(),
+                    metadata.remoteDebugPort(),
+                    metadata.remoteDebugSuspend(),
                     runId
             );
             handle = runtimeAdapter.start(spec);

@@ -554,14 +554,78 @@ AccountFieldType.NUMBER
 AccountFieldType.PASSWORD
 AccountFieldType.SWITCH
 AccountFieldType.RADIO
+AccountFieldType.SELECT
 AccountFieldType.CHECKBOX
+AccountFieldType.MULTI_SELECT
 AccountFieldType.LIST
 AccountFieldType.MAP
+AccountFieldType.OBJECT_LIST
+AccountFieldType.DATE
+AccountFieldType.TIME
+AccountFieldType.DATETIME
 ```
 
 `@AccountId` 标记账户主键字段。该字段必须同时声明 `@AccountField`，且不能是敏感字段。
 
-### 9.2 声明账户能力
+### 9.2 条件展示字段
+
+`@AccountField` 支持与 `@ConfigField` 相同的条件展示属性：
+
+```java
+@AccountField(label = "认证方式", type = AccountFieldType.SELECT, options = {"password", "token"})
+private String authType;
+
+@AccountField(label = "密码", type = AccountFieldType.PASSWORD,
+        sensitive = true, visibleWhenField = "authType", visibleWhenEquals = "password")
+private String password;
+
+@AccountField(label = "Token", sensitive = true,
+        visibleWhenField = "authType", visibleWhenIn = {"token"})
+private String token;
+```
+
+- `visibleWhenField + visibleWhenEquals` 表示控制字段等于指定值时显示。
+- `visibleWhenField + visibleWhenIn` 表示控制字段值在集合中时显示。
+- 控制字段必须是同一个账户类、或同一个 `OBJECT_LIST` item 内的字段，不能引用自身。
+- `visibleWhenEquals` 和 `visibleWhenIn` 不能同时设置。
+- `SWITCH` 控制字段的条件值只能是 `"true"` 或 `"false"`，生成 Schema 时会转换为 JSON boolean。
+
+后端将条件写入账户 Schema 的 `visibleWhen` 属性，账户表单渲染端负责根据该属性控制字段展示。
+
+### 9.3 成组列表账户字段
+
+可重复的关联账户字段可以使用 `AccountFieldType.OBJECT_LIST`：
+
+```java
+import java.util.List;
+
+@AccountField(
+        label = "凭据列表",
+        type = AccountFieldType.OBJECT_LIST,
+        required = true,
+        itemClass = Credential.class
+)
+private List<Credential> credentials;
+
+public static class Credential {
+    @AccountField(label = "名称", required = true)
+    private String name;
+
+    @AccountField(label = "Token", type = AccountFieldType.PASSWORD, sensitive = true)
+    private String token;
+}
+```
+
+限制与配置 `OBJECT_LIST` 基本一致：
+
+- 必须设置 `itemClass`，且该类必须位于当前插件 jar 内。
+- item 类不要求带 `@PluginAccount`，但至少要有一个字段声明 `@AccountField`。
+- `OBJECT_LIST` 不能设置 `options`，暂不支持嵌套。
+- 非 `OBJECT_LIST` 字段不能设置 `itemClass`。
+- item 字段不能声明 `@AccountId`。
+- 子字段的 `visibleWhen` 只能引用同一行 item 内的 sibling 字段。
+
+### 9.4 声明账户能力
 
 ```java
 @SkyPlugin(
@@ -572,7 +636,7 @@ AccountFieldType.MAP
 )
 ```
 
-### 9.3 读取账户
+### 9.5 读取账户
 
 平台只会向插件返回启用账户。
 
@@ -602,7 +666,7 @@ DemoAccount account = context.accounts()
 List<String> accountJsonList = context.accounts().listJson();
 ```
 
-### 9.4 更新账户
+### 9.6 更新账户
 
 ```java
 DemoAccount account = new DemoAccount();

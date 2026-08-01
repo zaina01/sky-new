@@ -45,6 +45,13 @@ public interface PluginRuntimeMetadataMapper {
             @Param("startedAt") LocalDateTime startedAt
     );
 
+    int updateRemoteDebug(
+            @Param("pluginId") String pluginId,
+            @Param("enabled") boolean enabled,
+            @Param("port") int port,
+            @Param("suspend") boolean suspend
+    );
+
     int stopStaleRunningRuntimes();
 
     int deleteByPluginId(@Param("pluginId") String pluginId);

@@ -82,6 +82,7 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.DELETE, "/plugin-service/permissions/*").hasAuthority(PermissionNames.PLUGIN_SERVICE_PERMISSION_WRITE)
                         .requestMatchers(HttpMethod.GET, "/plugins/runtimes/**").hasAuthority(PermissionNames.PLUGIN_RUNTIME_READ)
                         .requestMatchers(HttpMethod.DELETE, "/plugins/runtimes/*").hasAuthority(PermissionNames.PLUGIN_RUNTIME_MANAGE)
+                        .requestMatchers(HttpMethod.PUT, "/plugins/runtimes/*/debug").hasAuthority(PermissionNames.PLUGIN_RUNTIME_MANAGE)
                         .requestMatchers(HttpMethod.POST, "/plugins/runtimes/*/start").hasAuthority(PermissionNames.PLUGIN_RUNTIME_MANAGE)
                         .requestMatchers(HttpMethod.POST, "/plugins/runtimes/*/stop").hasAuthority(PermissionNames.PLUGIN_RUNTIME_MANAGE)
                         .requestMatchers(HttpMethod.POST, "/plugins/runtimes/*/restart").hasAuthority(PermissionNames.PLUGIN_RUNTIME_MANAGE)

@@ -29,6 +29,9 @@
             <arg column="config_schema_json" javaType="java.lang.String"/>
             <arg column="account_schema_json" javaType="java.lang.String"/>
             <arg column="dependency_jars_json" javaType="java.lang.String"/>
+            <arg column="remote_debug_enabled" javaType="_boolean"/>
+            <arg column="remote_debug_port" javaType="_int"/>
+            <arg column="remote_debug_suspend" javaType="_boolean"/>
             <arg column="started_at" javaType="java.time.LocalDateTime"/>
             <arg column="created_at" javaType="java.time.LocalDateTime"/>
             <arg column="updated_at" javaType="java.time.LocalDateTime"/>
@@ -118,6 +121,12 @@
     <update id="updateLifecycle">
         UPDATE plugin_runtime
         SET state = #{state}, runner_host = #{runnerHost}, runner_port = #{runnerPort}, work_dir = #{workDir}, started_at = #{startedAt}, updated_at = CURRENT_TIMESTAMP
+        WHERE plugin_id = #{pluginId}
+    </update>
+
+    <update id="updateRemoteDebug">
+        UPDATE plugin_runtime
+        SET remote_debug_enabled = #{enabled}, remote_debug_port = #{port}, remote_debug_suspend = #{suspend}, updated_at = CURRENT_TIMESTAMP
         WHERE plugin_id = #{pluginId}
     </update>
 

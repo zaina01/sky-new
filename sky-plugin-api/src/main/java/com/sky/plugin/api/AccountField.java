@@ -19,4 +19,12 @@ public @interface AccountField {
     boolean readonly() default false;
 
     String[] options() default {};
+
+    Class<?> itemClass() default Void.class;
+
+    String visibleWhenField() default "";
+
+    String visibleWhenEquals() default "";
+
+    String[] visibleWhenIn() default {};
 }

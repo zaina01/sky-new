@@ -18,6 +18,7 @@ public interface PluginAccountMapper {
             @Param("pluginId") String pluginId,
             @Param("enabled") Boolean enabled,
             @Param("accountId") String accountId,
+            @Param("accountIdLike") String accountIdLike,
             @Param("displayName") String displayName,
             @Param("displayNameLike") String displayNameLike,
             @Param("limit") int limit,
@@ -28,6 +29,7 @@ public interface PluginAccountMapper {
             @Param("pluginId") String pluginId,
             @Param("enabled") Boolean enabled,
             @Param("accountId") String accountId,
+            @Param("accountIdLike") String accountIdLike,
             @Param("displayName") String displayName,
             @Param("displayNameLike") String displayNameLike,
             @Param("limit") int limit
@@ -37,6 +39,7 @@ public interface PluginAccountMapper {
             @Param("pluginId") String pluginId,
             @Param("enabled") Boolean enabled,
             @Param("accountId") String accountId,
+            @Param("accountIdLike") String accountIdLike,
             @Param("displayName") String displayName,
             @Param("displayNameLike") String displayNameLike
     );

@@ -34,15 +34,15 @@ public class PluginAccountStore {
     public List<PluginAccount> list(String pluginId, Boolean enabled, String accountId, String displayName, Integer page, Integer size) {
         int normalizedPage = Math.max(page == null ? 1 : page, 1);
         int normalizedSize = Math.min(Math.max(size == null ? 20 : size, 1), 100);
-        return mapper.listManaged(pluginId, enabled, accountId, displayName, like(displayName), normalizedSize, (normalizedPage - 1) * normalizedSize);
+        return mapper.listManaged(pluginId, enabled, accountId, like(accountId), displayName, like(displayName), normalizedSize, (normalizedPage - 1) * normalizedSize);
     }
 
     public long count(String pluginId, Boolean enabled, String accountId, String displayName) {
-        return mapper.countManaged(pluginId, enabled, accountId, displayName, like(displayName));
+        return mapper.countManaged(pluginId, enabled, accountId, like(accountId), displayName, like(displayName));
     }
 
     public List<PluginAccount> listManagedForExport(String pluginId, Boolean enabled, String accountId, String displayName, int limit) {
-        return mapper.listManagedForExport(pluginId, enabled, accountId, displayName, like(displayName), limit);
+        return mapper.listManagedForExport(pluginId, enabled, accountId, like(accountId), displayName, like(displayName), limit);
     }
 
     public Optional<PluginAccount> getManaged(String pluginId, String accountId) {

@@ -20,6 +20,9 @@ public record PluginRuntimeRow(
         String configSchemaJson,
         String accountSchemaJson,
         String dependencyJarsJson,
+        boolean remoteDebugEnabled,
+        int remoteDebugPort,
+        boolean remoteDebugSuspend,
         LocalDateTime startedAt,
         LocalDateTime createdAt,
         LocalDateTime updatedAt

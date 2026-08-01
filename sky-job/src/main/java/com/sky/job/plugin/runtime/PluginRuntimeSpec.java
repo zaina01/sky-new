@@ -16,9 +16,13 @@ public record PluginRuntimeSpec(
         int hostGrpcPort,
         List<Path> dependencyPaths,
         Set<PluginCapability> capabilities,
+        boolean remoteDebugEnabled,
+        int remoteDebugPort,
+        boolean remoteDebugSuspend,
         String runId
 ) {
     public PluginRuntimeSpec {
+        if (remoteDebugPort <= 0) remoteDebugPort = 5005;
         runId = runId == null || runId.isBlank() ? java.util.UUID.randomUUID().toString() : runId;
     }
 }

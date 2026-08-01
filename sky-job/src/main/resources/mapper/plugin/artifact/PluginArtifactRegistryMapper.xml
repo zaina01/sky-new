@@ -16,7 +16,8 @@
             main_class = VALUES(main_class), artifact_path = VALUES(artifact_path), artifact_sha256 = VALUES(artifact_sha256),
             runtime_type = VALUES(runtime_type), state = 'STOPPED', runner_port = NULL, started_at = NULL, capabilities_json = VALUES(capabilities_json),
             config_schema_json = VALUES(config_schema_json), account_schema_json = VALUES(account_schema_json),
-            dependency_jars_json = CASE WHEN #{overwriteDependencies} THEN VALUES(dependency_jars_json) ELSE dependency_jars_json END
+            dependency_jars_json = CASE WHEN #{overwriteDependencies} THEN VALUES(dependency_jars_json) ELSE dependency_jars_json END,
+            remote_debug_enabled = FALSE, remote_debug_port = 5005, remote_debug_suspend = TRUE
     </insert>
 
     <update id="updateDependencyJars">

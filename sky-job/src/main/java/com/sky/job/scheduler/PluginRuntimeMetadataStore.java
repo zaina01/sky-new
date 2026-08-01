@@ -104,7 +104,10 @@ public class PluginRuntimeMetadataStore {
                 Path.of(row.artifactPath()),
                 row.artifactSha256(),
                 dependencyPaths(row.dependencyJarsJson()),
-                capabilities
+                capabilities,
+                row.remoteDebugEnabled(),
+                row.remoteDebugPort(),
+                row.remoteDebugSuspend()
         );
     }
 
@@ -127,10 +130,17 @@ public class PluginRuntimeMetadataStore {
                 row.configSchemaJson(),
                 row.accountSchemaJson(),
                 row.dependencyJarsJson(),
+                row.remoteDebugEnabled(),
+                row.remoteDebugPort(),
+                row.remoteDebugSuspend(),
                 row.startedAt(),
                 row.createdAt(),
                 row.updatedAt()
         );
+    }
+
+    public int updateRemoteDebug(String pluginId, boolean enabled, int port, boolean suspend) {
+        return mapper.updateRemoteDebug(pluginId, enabled, port, suspend);
     }
 
     public Set<PluginCapability> runtimeCapabilities(String capabilitiesJson) {

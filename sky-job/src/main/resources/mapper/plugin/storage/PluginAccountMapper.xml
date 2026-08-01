@@ -51,7 +51,7 @@
                 AND enabled = #{enabled}
             </if>
             <if test="accountId != null and accountId != ''">
-                AND account_id = #{accountId}
+                AND account_id LIKE #{accountIdLike}
             </if>
             <if test="displayName != null and displayName != ''">
                 AND display_name LIKE #{displayNameLike}
@@ -70,7 +70,7 @@
                 AND enabled = #{enabled}
             </if>
             <if test="accountId != null and accountId != ''">
-                AND account_id = #{accountId}
+                AND account_id LIKE #{accountIdLike}
             </if>
             <if test="displayName != null and displayName != ''">
                 AND display_name LIKE #{displayNameLike}
@@ -89,7 +89,7 @@
                 AND enabled = #{enabled}
             </if>
             <if test="accountId != null and accountId != ''">
-                AND account_id = #{accountId}
+                AND account_id LIKE #{accountIdLike}
             </if>
             <if test="displayName != null and displayName != ''">
                 AND display_name LIKE #{displayNameLike}

@@ -7,6 +7,7 @@ import com.sky.job.notification.NotificationEventType;
 import com.sky.job.notification.NotificationService;
 import com.sky.job.plugin.runtime.dto.PluginOptionResponse;
 import com.sky.job.plugin.runtime.dto.PluginRuntimeResponse;
+import com.sky.job.plugin.runtime.dto.UpdatePluginRuntimeDebugRequest;
 import com.sky.job.plugin.runtime.process.ProcessPluginRuntimeProperties;
 import com.sky.job.plugin.storage.PluginAccountStore;
 import com.sky.job.plugin.storage.PluginAuditStore;
@@ -116,6 +117,16 @@ public class PluginRuntimeService {
         return response;
     }
 
+    public PluginRuntimeResponse updateDebug(String pluginId, UpdatePluginRuntimeDebugRequest request, String actor) {
+        PluginRuntimeRecord record = record(pluginId);
+        validateDebugRequest(request);
+        if (store.updateRemoteDebug(pluginId, request.enabled(), request.port(), request.suspend()) == 0) {
+            throw new IllegalArgumentException("Plugin runtime not found");
+        }
+        auditRuntimeDebugUpdate(record, request, actor);
+        return detail(pluginId);
+    }
+
     @Transactional
     public synchronized void uninstall(String pluginId, String actor) {
         PluginRuntimeRecord record = record(pluginId);
@@ -159,6 +170,9 @@ public class PluginRuntimeService {
                     hostGrpcPort,
                     store.dependencyPaths(record.dependencyJarsJson()),
                     store.runtimeCapabilities(record.capabilitiesJson()),
+                    record.remoteDebugEnabled(),
+                    record.remoteDebugPort(),
+                    record.remoteDebugSuspend(),
                     null
             ));
             registry.put(handle);
@@ -258,6 +272,17 @@ public class PluginRuntimeService {
         audit(response.pluginId(), response.instanceId(), actor, "PLUGIN_RUNTIME_RESTART", detail);
     }
 
+    private void auditRuntimeDebugUpdate(PluginRuntimeRecord record, UpdatePluginRuntimeDebugRequest request, String actor) {
+        Map<String, Object> detail = new LinkedHashMap<>();
+        detail.put("previousEnabled", record.remoteDebugEnabled());
+        detail.put("previousPort", record.remoteDebugPort());
+        detail.put("previousSuspend", record.remoteDebugSuspend());
+        detail.put("enabled", request.enabled());
+        detail.put("port", request.port());
+        detail.put("suspend", request.suspend());
+        audit(record.pluginId(), record.instanceId(), actor, "PLUGIN_RUNTIME_DEBUG_UPDATE", detail);
+    }
+
     private Map<String, Object> baseRuntimeDetail(PluginRuntimeRecord record, PluginRuntimeState previousState, PluginRuntimeState state) {
         Map<String, Object> detail = new LinkedHashMap<>();
         detail.put("previousState", previousState.name());
@@ -309,6 +334,15 @@ public class PluginRuntimeService {
         Set<?> capabilities = store.runtimeCapabilities(record.capabilitiesJson());
         if (capabilities.isEmpty()) {
             throw new IllegalArgumentException("Plugin runtime capabilities are incomplete");
+        }
+    }
+
+    private void validateDebugRequest(UpdatePluginRuntimeDebugRequest request) {
+        if (request == null || request.enabled() == null || request.port() == null || request.suspend() == null) {
+            throw new IllegalArgumentException("Plugin runtime debug settings are required");
+        }
+        if (request.port() < 1 || request.port() > 65535) {
+            throw new IllegalArgumentException("Plugin runtime debug port is out of range");
         }
     }
 

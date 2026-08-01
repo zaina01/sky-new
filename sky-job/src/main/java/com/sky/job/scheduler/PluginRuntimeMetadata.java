@@ -13,6 +13,9 @@ public record PluginRuntimeMetadata(
         Path artifactPath,
         String artifactSha256,
         List<Path> dependencyPaths,
-        Set<PluginCapability> capabilities
+        Set<PluginCapability> capabilities,
+        boolean remoteDebugEnabled,
+        int remoteDebugPort,
+        boolean remoteDebugSuspend
 ) {
 }

@@ -311,6 +311,9 @@ final class PluginClassMetadataScanner {
                 case "required" -> builder.required = (Boolean) value;
                 case "sensitive" -> builder.sensitive = (Boolean) value;
                 case "readonly" -> builder.readonly = (Boolean) value;
+                case "itemClass" -> builder.itemClass = ((Type) value).getClassName();
+                case "visibleWhenField" -> builder.visibleWhenField = value.toString();
+                case "visibleWhenEquals" -> builder.visibleWhenEquals = value.toString();
                 default -> {
                 }
             }
@@ -325,16 +328,25 @@ final class PluginClassMetadataScanner {
 
         @Override
         public AnnotationVisitor visitArray(String name) {
-            if (!"options".equals(name)) {
-                return null;
+            if ("options".equals(name)) {
+                builder.options = new ArrayList<>();
+                return new AnnotationVisitor(Opcodes.ASM9) {
+                    @Override
+                    public void visit(String name, Object value) {
+                        builder.options.add(value.toString());
+                    }
+                };
             }
-            builder.options = new ArrayList<>();
-            return new AnnotationVisitor(Opcodes.ASM9) {
-                @Override
-                public void visit(String name, Object value) {
-                    builder.options.add(value.toString());
-                }
-            };
+            if ("visibleWhenIn".equals(name)) {
+                builder.visibleWhenIn = new ArrayList<>();
+                return new AnnotationVisitor(Opcodes.ASM9) {
+                    @Override
+                    public void visit(String name, Object value) {
+                        builder.visibleWhenIn.add(value.toString());
+                    }
+                };
+            }
+            return null;
         }
 
         @Override
@@ -429,7 +441,18 @@ final class PluginClassMetadataScanner {
         }
     }
 
-    record AccountFieldMetadata(String label, String type, boolean required, boolean sensitive, boolean readonly, List<String> options) {
+    record AccountFieldMetadata(
+            String label,
+            String type,
+            boolean required,
+            boolean sensitive,
+            boolean readonly,
+            List<String> options,
+            String itemClass,
+            String visibleWhenField,
+            String visibleWhenEquals,
+            List<String> visibleWhenIn
+    ) {
         private static final class Builder {
             private String label;
             private String type = "TEXT";
@@ -437,9 +460,24 @@ final class PluginClassMetadataScanner {
             private boolean sensitive;
             private boolean readonly;
             private List<String> options = new ArrayList<>();
+            private String itemClass = VOID_CLASS_NAME;
+            private String visibleWhenField = "";
+            private String visibleWhenEquals = "";
+            private List<String> visibleWhenIn = new ArrayList<>();
 
             private AccountFieldMetadata build() {
-                return new AccountFieldMetadata(label, type, required, sensitive, readonly, List.copyOf(options));
+                return new AccountFieldMetadata(
+                        label,
+                        type,
+                        required,
+                        sensitive,
+                        readonly,
+                        List.copyOf(options),
+                        itemClass,
+                        visibleWhenField,
+                        visibleWhenEquals,
+                        List.copyOf(visibleWhenIn)
+                );
             }
         }
     }

@@ -6,7 +6,13 @@ public enum AccountFieldType {
     PASSWORD,
     SWITCH,
     RADIO,
+    SELECT,
     CHECKBOX,
+    MULTI_SELECT,
     LIST,
-    MAP
+    MAP,
+    OBJECT_LIST,
+    DATE,
+    TIME,
+    DATETIME
 }
