@@ -1,0 +1,87 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.sky.job.system.mapper.DepartmentMapper">
+    <resultMap id="DepartmentResultMap" type="com.sky.job.system.Department">
+        <constructor>
+            <arg column="department_id" javaType="java.lang.Long"/>
+            <arg column="parent_id" javaType="java.lang.Long"/>
+            <arg column="department_name" javaType="java.lang.String"/>
+            <arg column="sort_order" javaType="_int"/>
+            <arg column="enabled" javaType="_boolean"/>
+            <arg column="deleted" javaType="_boolean"/>
+            <arg column="created_at" javaType="java.time.LocalDateTime"/>
+            <arg column="updated_at" javaType="java.time.LocalDateTime"/>
+        </constructor>
+    </resultMap>
+
+    <select id="list" resultMap="DepartmentResultMap">
+        SELECT *
+        FROM sky_department
+        WHERE deleted = FALSE
+        <if test="departmentName != null and departmentName != ''">
+            AND department_name LIKE #{departmentNameLike}
+        </if>
+        <if test="enabled != null">
+            AND enabled = #{enabled}
+        </if>
+        ORDER BY sort_order ASC, department_id ASC
+    </select>
+
+    <select id="findById" resultMap="DepartmentResultMap">
+        SELECT * FROM sky_department WHERE department_id = #{departmentId} AND deleted = FALSE
+    </select>
+
+    <select id="descendantIds" resultType="java.lang.Long">
+        WITH RECURSIVE department_tree AS (
+            SELECT department_id FROM sky_department WHERE department_id = #{departmentId}
+            UNION ALL
+            SELECT child.department_id
+            FROM sky_department child
+            JOIN department_tree parent ON child.parent_id = parent.department_id
+        )
+        SELECT department_id FROM department_tree
+    </select>
+
+    <select id="countByName" resultType="int">
+        SELECT COUNT(*) FROM sky_department
+        WHERE deleted = FALSE AND department_name = #{departmentName}
+          AND ((parent_id IS NULL AND #{parentId} IS NULL) OR parent_id = #{parentId})
+    </select>
+
+    <select id="countByNameForOther" resultType="int">
+        SELECT COUNT(*) FROM sky_department
+        WHERE deleted = FALSE AND department_name = #{departmentName} AND department_id &lt;&gt; #{departmentId}
+          AND ((parent_id IS NULL AND #{parentId} IS NULL) OR parent_id = #{parentId})
+    </select>
+
+    <select id="countChildren" resultType="int">
+        SELECT COUNT(*) FROM sky_department WHERE parent_id = #{departmentId} AND deleted = FALSE
+    </select>
+
+    <select id="countUsers" resultType="int">
+        SELECT COUNT(*) FROM sky_user WHERE department_id = #{departmentId}
+    </select>
+
+    <insert id="insert" useGeneratedKeys="true" keyProperty="departmentId">
+        INSERT INTO sky_department (parent_id, department_name, sort_order, enabled)
+        VALUES (#{parentId}, #{departmentName}, #{sortOrder}, #{enabled})
+    </insert>
+
+    <update id="update">
+        UPDATE sky_department
+        SET parent_id = #{parentId}, department_name = #{departmentName}, sort_order = #{sortOrder}, enabled = #{enabled}, updated_at = CURRENT_TIMESTAMP
+        WHERE department_id = #{departmentId} AND deleted = FALSE
+    </update>
+
+    <update id="updateEnabled">
+        UPDATE sky_department SET enabled = #{enabled}, updated_at = CURRENT_TIMESTAMP
+        WHERE department_id = #{departmentId} AND deleted = FALSE
+    </update>
+
+    <update id="softDelete">
+        UPDATE sky_department SET deleted = TRUE, enabled = FALSE, updated_at = CURRENT_TIMESTAMP
+        WHERE department_id = #{departmentId} AND deleted = FALSE
+    </update>
+</mapper>

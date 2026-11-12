@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.sky.job.plugin.storage.mapper.PluginAccountGroupMapper">
+    <resultMap id="GroupResultMap" type="com.sky.job.plugin.storage.PluginAccountGroup">
+        <constructor>
+            <arg column="group_id" javaType="_long"/>
+            <arg column="name" javaType="java.lang.String"/>
+            <arg column="account_count" javaType="_long"/>
+            <arg column="created_at" javaType="java.time.LocalDateTime"/>
+            <arg column="updated_at" javaType="java.time.LocalDateTime"/>
+        </constructor>
+    </resultMap>
+    <sql id="groupColumns">
+        g.group_id, g.name, g.created_at, g.updated_at,
+        (SELECT COUNT(*) FROM plugin_account a
+         WHERE a.installation_id = g.installation_id AND a.group_id = g.group_id) AS account_count
+    </sql>
+    <select id="list" resultMap="GroupResultMap">
+        SELECT <include refid="groupColumns"/> FROM plugin_account_group g
+        WHERE g.installation_id = #{installationId}
+        ORDER BY g.created_at ASC, g.group_id ASC
+    </select>
+    <select id="find" resultMap="GroupResultMap">
+        SELECT <include refid="groupColumns"/> FROM plugin_account_group g
+        WHERE g.installation_id = #{installationId} AND g.group_id = #{groupId}
+    </select>
+    <select id="lock" resultMap="GroupResultMap">
+        SELECT <include refid="groupColumns"/> FROM plugin_account_group g
+        WHERE g.installation_id = #{installationId} AND g.group_id = #{groupId} FOR UPDATE
+    </select>
+    <insert id="insert" useGeneratedKeys="true" keyProperty="groupId" keyColumn="group_id">
+        INSERT INTO plugin_account_group (installation_id, name) VALUES (#{installationId}, #{name})
+    </insert>
+    <update id="rename">
+        UPDATE plugin_account_group SET name = #{name}, updated_at = CURRENT_TIMESTAMP
+        WHERE installation_id = #{installationId} AND group_id = #{groupId}
+    </update>
+    <delete id="delete">
+        DELETE FROM plugin_account_group WHERE installation_id = #{installationId} AND group_id = #{groupId}
+    </delete>
+    <delete id="deleteByInstallationId">
+        DELETE FROM plugin_account_group WHERE installation_id = #{installationId}
+    </delete>
+</mapper>

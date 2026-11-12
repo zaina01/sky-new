@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.sky.job.plugin.storage.mapper.PluginAccountListPreferenceMapper">
+    <select id="findSelectedFieldsJson" resultType="java.lang.String">
+        SELECT selected_fields_json
+        FROM plugin_account_list_preference
+        WHERE user_id = #{userId} AND installation_id = #{installationId}
+    </select>
+
+    <insert id="upsert">
+        INSERT INTO plugin_account_list_preference (user_id, installation_id, selected_fields_json)
+        VALUES (#{userId}, #{installationId}, CAST(#{selectedFieldsJson} AS JSON))
+        ON DUPLICATE KEY UPDATE
+            selected_fields_json = VALUES(selected_fields_json),
+            updated_at = CURRENT_TIMESTAMP
+    </insert>
+
+    <delete id="delete">
+        DELETE FROM plugin_account_list_preference
+        WHERE user_id = #{userId} AND installation_id = #{installationId}
+    </delete>
+
+    <delete id="deleteByInstallationId">
+        DELETE FROM plugin_account_list_preference
+        WHERE installation_id = #{installationId}
+    </delete>
+</mapper>

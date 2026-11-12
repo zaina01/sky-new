@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.sky.job.system.mapper.DataOwnershipMapper">
+    <select id="jobIdsByInstallationId" resultType="java.lang.Long">
+        SELECT id FROM job WHERE plugin_installation_id=#{installationId} ORDER BY id
+    </select>
+
+    <select id="ruleIdsByInstallationId" resultType="java.lang.String">
+        SELECT rule_id FROM notification_rule WHERE plugin_installation_id=#{installationId} ORDER BY rule_id
+    </select>
+
+    <select id="servicePeerInstallationIds" resultType="java.lang.String">
+        SELECT target_installation_id AS installation_id
+        FROM plugin_service_permission
+        WHERE caller_installation_id=#{installationId}
+        UNION
+        SELECT caller_installation_id AS installation_id
+        FROM plugin_service_permission
+        WHERE target_installation_id=#{installationId}
+        ORDER BY installation_id
+    </select>
+
+    <select id="installationIdsByChannelId" resultType="java.lang.String">
+        SELECT installation_id FROM plugin_installation_channel WHERE channel_id=#{channelId} ORDER BY installation_id
+    </select>
+
+    <select id="jobIdsByChannelId" resultType="java.lang.Long">
+        SELECT job_id FROM job_notification_channel WHERE channel_id=#{channelId} ORDER BY job_id
+    </select>
+
+    <select id="ruleIdsByChannelId" resultType="java.lang.String">
+        SELECT rule_id FROM notification_rule_channel WHERE channel_id=#{channelId} ORDER BY rule_id
+    </select>
+
+    <select id="ruleIdsByJobId" resultType="java.lang.String">
+        SELECT rule_id FROM notification_rule WHERE job_id=#{jobId} ORDER BY rule_id
+    </select>
+</mapper>

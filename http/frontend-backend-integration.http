@@ -1,0 +1,380 @@
+@baseUrl = http://localhost:18080/api
+@adminUsername = frontend_it_admin
+@adminPassword = FrontendIt!2026
+@targetUsername = frontend_it_target
+@targetPassword = FrontendIt!2026
+
+### 管理员登录
+POST {{baseUrl}}/user/login
+Content-Type: application/json
+
+{
+  "username": "{{adminUsername}}",
+  "password": "{{adminPassword}}"
+}
+
+> {%
+client.test("管理员登录成功", function () {
+  client.assert(response.status === 200);
+  client.assert(response.body.code === 0);
+});
+client.global.set("adminToken", response.body.data.token);
+%}
+
+### 获取两个同定义安装实例并保存 ID
+GET {{baseUrl}}/plugins/installations?pluginId=frontend-integration&page=1&size=20
+Authorization: Bearer {{adminToken}}
+
+> {%
+client.test("双实例及真实 total", function () {
+  client.assert(response.body.data.total >= 2);
+});
+const items = response.body.data.items;
+client.global.set("installationA", items.find(item => item.installationName === "Frontend IT A").installationId);
+client.global.set("installationB", items.find(item => item.installationName === "Frontend IT B").installationId);
+%}
+
+### 获取 SERVICE 实例并保存 ID
+GET {{baseUrl}}/plugins/installations?pluginId=frontend-integration-service&page=1&size=20
+Authorization: Bearer {{adminToken}}
+
+> {%
+const service = response.body.data.items.find(item => item.installationName === "Frontend IT Echo Service");
+client.test("存在真实 SERVICE 实例", function () {
+  client.assert(response.body.data.total >= 1);
+  client.assert(!!service);
+  client.assert(service.pluginId === "frontend-integration-service");
+});
+client.global.set("serviceInstallation", service.installationId);
+%}
+
+### P0：实例 A 渠道池读取
+GET {{baseUrl}}/plugins/installations/{{installationA}}/notification-channels
+Authorization: Bearer {{adminToken}}
+
+> {%
+client.test("实例 A 只返回自己的渠道池", function () {
+  client.assert(response.body.code === 0);
+  client.assert(JSON.stringify(response.body.data) === JSON.stringify(["frontend-it-channel-a"]));
+});
+%}
+
+### P0：实例 B 渠道池读取
+GET {{baseUrl}}/plugins/installations/{{installationB}}/notification-channels
+Authorization: Bearer {{adminToken}}
+
+> {%
+client.test("实例 B 只返回自己的渠道池", function () {
+  client.assert(response.body.code === 0);
+  client.assert(JSON.stringify(response.body.data) === JSON.stringify(["frontend-it-channel-b"]));
+});
+%}
+
+### 实例 A 配置
+GET {{baseUrl}}/plugins/installations/{{installationA}}/config
+Authorization: Bearer {{adminToken}}
+
+> {% client.test("实例 A 配置隔离", function () { client.assert(response.body.data.configJson.includes("config-a")); }); %}
+
+### 实例 B 配置
+GET {{baseUrl}}/plugins/installations/{{installationB}}/config
+Authorization: Bearer {{adminToken}}
+
+> {% client.test("实例 B 配置隔离", function () { client.assert(response.body.data.configJson.includes("config-b")); }); %}
+
+### 实例 A 账户分页
+GET {{baseUrl}}/plugins/installations/{{installationA}}/accounts?page=1&size=1
+Authorization: Bearer {{adminToken}}
+
+> {% client.test("实例 A 账户与 total", function () { client.assert(response.body.data.total === 1); client.assert(response.body.data.items[0].accountId === "account-a"); }); %}
+
+### Account list column preference candidates
+GET {{baseUrl}}/plugins/installations/{{installationA}}/accounts/view-preference
+Authorization: Bearer {{adminToken}}
+
+> {%
+client.test("Only non-sensitive account fields are selectable", function () {
+  const fields = response.body.data.availableFields.map(field => field.name);
+  client.assert(JSON.stringify(fields) === JSON.stringify(["region", "expireAt"]));
+  client.assert(response.body.data.maxFields === 5);
+});
+%}
+
+### Save ordered account list columns
+PUT {{baseUrl}}/plugins/installations/{{installationA}}/accounts/view-preference
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{
+  "fields": ["expireAt", "region"]
+}
+
+> {%
+client.test("Account list column order is persisted", function () {
+  client.assert(JSON.stringify(response.body.data.fields) === JSON.stringify(["expireAt", "region"]));
+});
+%}
+
+### Account list contains only the safe projection
+GET {{baseUrl}}/plugins/installations/{{installationA}}/accounts?page=1&size=1
+Authorization: Bearer {{adminToken}}
+
+> {%
+client.test("Account list never exposes accountJson or secret", function () {
+  const item = response.body.data.items[0];
+  client.assert(item.accountJson === undefined);
+  client.assert(item.displayValues.region === "east");
+  client.assert(JSON.stringify(item).indexOf("secret-a") < 0);
+});
+%}
+
+### Installation B account page
+GET {{baseUrl}}/plugins/installations/{{installationB}}/accounts?page=1&size=1
+Authorization: Bearer {{adminToken}}
+
+> {% client.test("实例 B 账户与 total", function () { client.assert(response.body.data.total === 1); client.assert(response.body.data.items[0].accountId === "account-b"); }); %}
+
+### 完整部门树必须包含停用节点
+GET {{baseUrl}}/system/departments
+Authorization: Bearer {{adminToken}}
+
+> {% client.test("完整树包含停用部门", function () { client.assert(JSON.stringify(response.body.data).includes("Frontend IT Legacy Disabled")); }); %}
+
+### CUSTOM 角色必须保留停用部门 ID
+GET {{baseUrl}}/system/roles?roleName=FRONTEND_IT_CUSTOM&page=1&size=20
+Authorization: Bearer {{adminToken}}
+
+> {% client.test("CUSTOM 停用部门未丢失", function () { client.assert(response.body.data.items[0].departmentIds.length === 1); }); %}
+
+### 本地依赖仓库分页
+GET {{baseUrl}}/plugins/dependencies/local-artifacts?page=1&size=1
+Authorization: Bearer {{adminToken}}
+
+> {% client.test("依赖仓库返回 items/page/size/total", function () { client.assert(response.body.data.total >= 1); client.assert(response.body.data.items[0].coordinate === "com.sky.it:frontend-helper:1.0.0"); }); %}
+
+### 获取任务并保存 jobId
+GET {{baseUrl}}/jobs?page=1&size=20
+Authorization: Bearer {{adminToken}}
+
+> {%
+const job = response.body.data.items.find(item => item.jobName === "Frontend IT Job");
+client.global.set("jobId", job.id.toString());
+client.test("任务实例和渠道一致", function () {
+  client.assert(job.pluginInstallationId === client.global.get("installationB"));
+  client.assert(JSON.stringify(job.notificationChannelIds) === JSON.stringify(["frontend-it-channel-b"]));
+});
+%}
+
+### 服务权限非空列表并保存 permissionId
+GET {{baseUrl}}/plugin-service/permissions?callerInstallationId={{installationB}}&targetInstallationId={{serviceInstallation}}&operation=echo&page=1&size=20
+Authorization: Bearer {{adminToken}}
+
+> {%
+client.test("服务权限使用真实非空 total", function () {
+  client.assert(response.body.data.total === 1);
+  client.assert(response.body.data.items[0].targetPluginId === "frontend-integration-service");
+  client.assert(response.body.data.items[0].operation === "echo");
+});
+client.global.set("servicePermissionId", response.body.data.items[0].id.toString());
+%}
+
+### 服务权限详情
+GET {{baseUrl}}/plugin-service/permissions/{{servicePermissionId}}
+Authorization: Bearer {{adminToken}}
+
+> {% client.test("服务权限详情可读", function () { client.assert(response.body.data.id.toString() === client.global.get("servicePermissionId")); }); %}
+
+### 服务权限停用
+PATCH {{baseUrl}}/plugin-service/permissions/{{servicePermissionId}}/enabled
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{
+  "enabled": false
+}
+
+> {% client.test("服务权限已停用", function () { client.assert(response.body.data.enabled === false); }); %}
+
+### 服务权限重新启用
+PATCH {{baseUrl}}/plugin-service/permissions/{{servicePermissionId}}/enabled
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{
+  "enabled": true
+}
+
+> {% client.test("服务权限已启用", function () { client.assert(response.body.data.enabled === true); }); %}
+
+### 服务权限删除
+DELETE {{baseUrl}}/plugin-service/permissions/{{servicePermissionId}}
+Authorization: Bearer {{adminToken}}
+
+> {% client.test("服务权限删除成功", function () { client.assert(response.body.data.success === true); }); %}
+
+### 服务权限重建，保留后续调用所需白名单
+POST {{baseUrl}}/plugin-service/permissions
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{
+  "callerInstallationId": "{{installationB}}",
+  "targetInstallationId": "{{serviceInstallation}}",
+  "operation": "echo",
+  "enabled": true
+}
+
+> {%
+client.test("服务权限重建成功", function () {
+  client.assert(response.body.data.enabled === true);
+  client.assert(response.body.data.targetPluginId === "frontend-integration-service");
+});
+client.global.set("servicePermissionId", response.body.data.id.toString());
+%}
+
+### 通过任务 runner 触发真实插件服务调用
+POST {{baseUrl}}/jobs/{{jobId}}/run
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{
+  "inputJson": "{\"serviceInstallationId\":\"{{serviceInstallation}}\"}",
+  "timeoutMillis": 30000
+}
+
+> {%
+client.test("服务调用任务已提交", function () {
+  client.assert(response.body.code === 0);
+  client.assert(!!response.body.data.executionId);
+});
+client.global.set("serviceExecutionId", response.body.data.executionId.toString());
+%}
+
+### 服务调用日志非空（任务刚提交时可稍后重跑此请求）
+GET {{baseUrl}}/plugin-service/calls?callerInstallationId={{installationB}}&targetInstallationId={{serviceInstallation}}&operation=echo&page=1&size=20
+Authorization: Bearer {{adminToken}}
+
+> {%
+client.test("真实服务调用日志非空", function () {
+  client.assert(response.body.data.total >= 1);
+  client.assert(response.body.data.items[0].success === true);
+  client.assert(response.body.data.items[0].targetPluginId === "frontend-integration-service");
+});
+client.global.set("serviceCallId", response.body.data.items[0].id.toString());
+%}
+
+### 服务调用详情
+GET {{baseUrl}}/plugin-service/calls/{{serviceCallId}}
+Authorization: Bearer {{adminToken}}
+
+> {% client.test("服务调用详情包含真实请求标识", function () { client.assert(!!response.body.data.serviceRequestId); client.assert(response.body.data.responseBytes > 0); }); %}
+
+### 目标 SERVICE runner 日志
+GET {{baseUrl}}/plugin-service/calls/{{serviceCallId}}/logs?tailBytes=65536
+Authorization: Bearer {{adminToken}}
+
+> {% client.test("SERVICE runner 日志可读", function () { client.assert(response.body.data.exists === true); client.assert(response.body.data.content.includes("frontend integration service")); }); %}
+
+### 规则中的字符串 jobId 与实例一致
+GET {{baseUrl}}/notifications/rules/frontend-it-job-success
+Authorization: Bearer {{adminToken}}
+
+> {% client.test("规则关联一致", function () { client.assert(response.body.data.jobId === client.global.get("jobId")); client.assert(response.body.data.pluginInstallationId === client.global.get("installationB")); }); %}
+
+### 通知历史稳定 ID 快照
+GET {{baseUrl}}/notifications/history?jobId={{jobId}}&page=1&size=20
+Authorization: Bearer {{adminToken}}
+
+> {% client.test("历史返回来源、渠道和安装 ID 快照", function () { const item=response.body.data.items[0]; client.assert(!!item.sourceOwnerUserId); client.assert(!!item.channelOwnerUserId); client.assert(item.installationId === client.global.get("installationB")); }); %}
+
+### 原生不存在路由统一 404001
+GET {{baseUrl}}/frontend-it-route-does-not-exist
+Authorization: Bearer {{adminToken}}
+
+> {% client.test("原生 404 统一封装", function () { client.assert(response.status === 404); client.assert(response.body.code === 404001); }); %}
+
+### 使用转交前签发逻辑等价的 SELF 用户重新请求（无需因转交刷新权限模型）
+POST {{baseUrl}}/user/login
+Content-Type: application/json
+
+{
+  "username": "{{targetUsername}}",
+  "password": "{{targetPassword}}"
+}
+
+> {% client.global.set("targetToken", response.body.data.token); %}
+
+### SELF 用户立即看到转交后的实例
+GET {{baseUrl}}/plugins/installations?page=1&size=20
+Authorization: Bearer {{targetToken}}
+
+> {% client.test("转交后实例立即可见", function () { client.assert(response.body.data.total === 1); }); %}
+
+### SELF 用户当前权限和部门立即生效
+GET {{baseUrl}}/user/me
+Authorization: Bearer {{targetToken}}
+
+> {% client.test("me 返回当前数据库权限", function () { client.assert(response.body.data.permissions.includes("plugin:runtime:read")); }); %}
+
+### 创建实例 A 的账户分组（重复运行前先执行下方删除分组）
+POST {{baseUrl}}/plugins/installations/{{installationA}}/account-groups
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{"name":"联调主账户"}
+
+> {% client.test("分组创建", function () { client.assert(response.body.code === 0); }); client.global.set("accountGroupId", response.body.data.groupId); %}
+
+### 分组列表含账户数量
+GET {{baseUrl}}/plugins/installations/{{installationA}}/account-groups
+Authorization: Bearer {{adminToken}}
+
+### 单个账户加入分组
+PATCH {{baseUrl}}/plugins/installations/{{installationA}}/accounts/account-a/group
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{"groupId":{{accountGroupId}}}
+
+> {% client.test("账户加入分组", function () { client.assert(response.body.data.groupId === Number(client.global.get("accountGroupId"))); }); %}
+
+### 按组筛选（列表及导出均为最早创建在前）
+GET {{baseUrl}}/plugins/installations/{{installationA}}/accounts?groupId={{accountGroupId}}&page=1&size=20
+Authorization: Bearer {{adminToken}}
+
+> {% client.test("分组筛选及 total", function () { client.assert(response.body.data.total === 1); client.assert(response.body.data.items[0].groupName === "联调主账户"); }); %}
+
+### 按组导出，不增加分组列
+GET {{baseUrl}}/plugins/installations/{{installationA}}/accounts/export?groupId={{accountGroupId}}&format=csv
+Authorization: Bearer {{adminToken}}
+
+### 分组重命名
+PUT {{baseUrl}}/plugins/installations/{{installationA}}/account-groups/{{accountGroupId}}
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{"name":"联调主账户改名"}
+
+### 批量移出分组，显式 null 清空；省略 groupId 会返回 400
+PATCH {{baseUrl}}/plugins/installations/{{installationA}}/accounts/group
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{"accountIds":["account-a"],"groupId":null}
+
+> {% client.test("批量移出", function () { client.assert(response.body.data.succeeded === 1); }); %}
+
+### 查询未分组账户
+GET {{baseUrl}}/plugins/installations/{{installationA}}/accounts?ungrouped=true&page=1&size=20
+Authorization: Bearer {{adminToken}}
+
+### 单个账户也可显式清空分组
+PATCH {{baseUrl}}/plugins/installations/{{installationA}}/accounts/account-a/group
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{"groupId":null}
+
+### 删除分组（非空分组也可删除，账户保留并转为未分组）
+DELETE {{baseUrl}}/plugins/installations/{{installationA}}/account-groups/{{accountGroupId}}
+Authorization: Bearer {{adminToken}}
