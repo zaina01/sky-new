@@ -4,6 +4,7 @@ public record UpdateSystemUserRequest(
         String email,
         String phone,
         String avatar,
+        Long departmentId,
         Boolean enabled
 ) {
 }

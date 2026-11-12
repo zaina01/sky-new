@@ -6,35 +6,35 @@
     <select id="countByKey" resultType="int">
         SELECT COUNT(*)
         FROM plugin_data
-        WHERE plugin_id = #{pluginId} AND collection_name = #{collection} AND data_key = #{dataKey}
+        WHERE installation_id = #{installationId} AND collection_name = #{collection} AND data_key = #{dataKey}
     </select>
 
     <select id="countRows" resultType="int">
         SELECT COUNT(*)
         FROM plugin_data
-        WHERE plugin_id = #{pluginId}
+        WHERE installation_id = #{installationId}
     </select>
 
     <insert id="upsert">
-        INSERT INTO plugin_data (plugin_id, collection_name, data_key, data_json)
-        VALUES (#{pluginId}, #{collection}, #{dataKey}, CAST(#{dataJson} AS JSON))
+        INSERT INTO plugin_data (installation_id, collection_name, data_key, data_json)
+        VALUES (#{installationId}, #{collection}, #{dataKey}, CAST(#{dataJson} AS JSON))
         ON DUPLICATE KEY UPDATE data_json = VALUES(data_json), updated_at = CURRENT_TIMESTAMP
     </insert>
 
     <delete id="delete">
         DELETE FROM plugin_data
-        WHERE plugin_id = #{pluginId} AND collection_name = #{collection} AND data_key = #{dataKey}
+        WHERE installation_id = #{installationId} AND collection_name = #{collection} AND data_key = #{dataKey}
     </delete>
 
-    <delete id="deleteByPluginId">
+    <delete id="deleteByInstallationId">
         DELETE FROM plugin_data
-        WHERE plugin_id = #{pluginId}
+        WHERE installation_id = #{installationId}
     </delete>
 
     <select id="select" resultType="java.lang.String">
         SELECT data_json
         FROM plugin_data
-        WHERE plugin_id = #{pluginId} AND collection_name = #{collection} AND data_key = #{dataKey}
+        WHERE installation_id = #{installationId} AND collection_name = #{collection} AND data_key = #{dataKey}
     </select>
 
     <select id="selectAll" resultType="java.lang.String">
@@ -42,7 +42,7 @@
         FROM (
           SELECT data_key, data_json
           FROM plugin_data
-          WHERE plugin_id = #{pluginId} AND collection_name = #{collection}
+          WHERE installation_id = #{installationId} AND collection_name = #{collection}
           ORDER BY id
           LIMIT #{limit}
         ) limited_data

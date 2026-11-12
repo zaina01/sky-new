@@ -14,12 +14,13 @@ public record AuthenticatedUser(
         String userId,
         String username,
         String password,
+        Long departmentId,
         boolean enabled,
         Set<String> roles,
         Set<String> permissions
 ) implements UserDetails {
     public static AuthenticatedUser from(User user, Set<String> roles, Set<String> permissions) {
-        return new AuthenticatedUser(user.userId(), user.username(), user.passwordHash(), user.enabled(), roles, permissions);
+        return new AuthenticatedUser(user.userId(), user.username(), user.passwordHash(), user.departmentId(), user.enabled() && user.departmentEnabled(), roles, permissions);
     }
 
     @Override

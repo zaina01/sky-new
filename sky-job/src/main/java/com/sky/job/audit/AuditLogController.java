@@ -8,6 +8,8 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import com.sky.job.security.AuthenticatedUser;
 
 import java.time.LocalDateTime;
 
@@ -30,9 +32,10 @@ public class AuditLogController {
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime startTime,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime endTime,
             @RequestParam(required = false) Integer page,
-            @RequestParam(required = false) Integer size
+            @RequestParam(required = false) Integer size,
+            @AuthenticationPrincipal AuthenticatedUser user
     ) {
-        return queryService.listLoginLogs(username, userId, status, loginIp, deviceType, startTime, endTime, page, size);
+        return queryService.listLoginLogs(username, userId, status, loginIp, deviceType, startTime, endTime, page, size, user);
     }
 
     @GetMapping("/logs")
@@ -49,8 +52,9 @@ public class AuditLogController {
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime startTime,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime endTime,
             @RequestParam(required = false) Integer page,
-            @RequestParam(required = false) Integer size
+            @RequestParam(required = false) Integer size,
+            @AuthenticationPrincipal AuthenticatedUser user
     ) {
-        return queryService.listSystemLogs(module, action, level, status, operatorUserId, operatorName, sourceType, targetType, targetId, startTime, endTime, page, size);
+        return queryService.listSystemLogs(module, action, level, status, operatorUserId, operatorName, sourceType, targetType, targetId, startTime, endTime, page, size, user);
     }
 }

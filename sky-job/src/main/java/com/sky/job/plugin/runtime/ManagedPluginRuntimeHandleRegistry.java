@@ -11,16 +11,16 @@ import java.util.concurrent.ConcurrentMap;
 public class ManagedPluginRuntimeHandleRegistry {
     private final ConcurrentMap<String, PluginRuntimeHandle> handles = new ConcurrentHashMap<>();
 
-    public Optional<PluginRuntimeHandle> get(String pluginId) {
-        return Optional.ofNullable(handles.get(pluginId));
+    public Optional<PluginRuntimeHandle> get(String installationId) {
+        return Optional.ofNullable(handles.get(installationId));
     }
 
     public void put(PluginRuntimeHandle handle) {
-        handles.put(handle.pluginId(), handle);
+        handles.put(handle.installationId(), handle);
     }
 
-    public Optional<PluginRuntimeHandle> remove(String pluginId) {
-        return Optional.ofNullable(handles.remove(pluginId));
+    public Optional<PluginRuntimeHandle> remove(String installationId) {
+        return Optional.ofNullable(handles.remove(installationId));
     }
 
     public List<PluginRuntimeHandle> snapshot() {

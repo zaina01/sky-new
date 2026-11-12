@@ -1,6 +1,7 @@
 package com.sky.job.audit;
 
 import com.sky.job.audit.mapper.LoginLogMapper;
+import com.sky.job.security.EffectiveDataScope;
 import com.sky.job.user.User;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.stereotype.Repository;
@@ -19,11 +20,11 @@ public class LoginLogStore {
     }
 
     public void success(User user, HttpServletRequest request) {
-        insert(user.userId(), user.username(), "SUCCESS", null, request);
+        insert(user.userId(), user.departmentId(), user.username(), "SUCCESS", null, request);
     }
 
     public void failure(String username, String reason, HttpServletRequest request) {
-        insert(null, username, "FAILED", reason, request);
+        insert(null, null, username, "FAILED", reason, request);
     }
 
     public List<LoginLog> list(
@@ -34,10 +35,11 @@ public class LoginLogStore {
             String deviceType,
             LocalDateTime startTime,
             LocalDateTime endTime,
+            EffectiveDataScope scope,
             Integer page,
             Integer size
     ) {
-        return mapper.list(trim(username), like(username), trim(userId), trim(status), trim(loginIp), trim(deviceType), startTime, endTime, normalizedSize(size), (normalizedPage(page) - 1) * normalizedSize(size));
+        return mapper.list(trim(username), like(username), trim(userId), trim(status), trim(loginIp), trim(deviceType), startTime, endTime, scope, normalizedSize(size), (normalizedPage(page) - 1) * normalizedSize(size));
     }
 
     public long count(
@@ -47,9 +49,10 @@ public class LoginLogStore {
             String loginIp,
             String deviceType,
             LocalDateTime startTime,
-            LocalDateTime endTime
+            LocalDateTime endTime,
+            EffectiveDataScope scope
     ) {
-        return mapper.count(trim(username), like(username), trim(userId), trim(status), trim(loginIp), trim(deviceType), startTime, endTime);
+        return mapper.count(trim(username), like(username), trim(userId), trim(status), trim(loginIp), trim(deviceType), startTime, endTime, scope);
     }
 
     public long countOlderThan(LocalDateTime cutoff) {
@@ -60,10 +63,10 @@ public class LoginLogStore {
         return mapper.deleteOlderThan(cutoff, limit);
     }
 
-    private void insert(String userId, String username, String status, String failReason, HttpServletRequest request) {
+    private void insert(String userId, Long ownerDepartmentId, String username, String status, String failReason, HttpServletRequest request) {
         String userAgent = userAgent(request);
         String clientIp = clientIp(request);
-        mapper.insert(userId, username, status, deviceType(userAgent), clientIp, ipType(clientIp), userAgent, limit(failReason, MAX_FAIL_REASON_LENGTH), request.getRequestURI(), request.getMethod());
+        mapper.insert(userId, ownerDepartmentId, username, status, deviceType(userAgent), clientIp, ipType(clientIp), userAgent, limit(failReason, MAX_FAIL_REASON_LENGTH), request.getRequestURI(), request.getMethod());
     }
 
     private String userAgent(HttpServletRequest request) {

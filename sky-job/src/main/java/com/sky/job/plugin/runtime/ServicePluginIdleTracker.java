@@ -11,17 +11,17 @@ import java.util.concurrent.ConcurrentMap;
 public class ServicePluginIdleTracker {
     private final ConcurrentMap<String, Instant> lastCallTimes = new ConcurrentHashMap<>();
 
-    public void markCalled(String pluginId) {
-        if (pluginId != null && !pluginId.isBlank()) {
-            lastCallTimes.put(pluginId, Instant.now());
+    public void markCalled(String installationId) {
+        if (installationId != null && !installationId.isBlank()) {
+            lastCallTimes.put(installationId, Instant.now());
         }
     }
 
-    public Optional<Instant> lastCalledAt(String pluginId) {
-        return Optional.ofNullable(lastCallTimes.get(pluginId));
+    public Optional<Instant> lastCalledAt(String installationId) {
+        return Optional.ofNullable(lastCallTimes.get(installationId));
     }
 
-    public void remove(String pluginId) {
-        lastCallTimes.remove(pluginId);
+    public void remove(String installationId) {
+        lastCallTimes.remove(installationId);
     }
 }

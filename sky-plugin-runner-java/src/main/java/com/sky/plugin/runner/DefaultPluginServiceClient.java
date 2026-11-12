@@ -20,9 +20,19 @@ class DefaultPluginServiceClient implements PluginServiceClient {
 
     @Override
     public PluginServiceResponse call(String targetPluginId, String operation, String requestJson) {
+        return call(targetPluginId, "", operation, requestJson);
+    }
+
+    @Override
+    public PluginServiceResponse callInstallation(String targetInstallationId, String operation, String requestJson) {
+        return call("", targetInstallationId, operation, requestJson);
+    }
+
+    private PluginServiceResponse call(String targetPluginId, String targetInstallationId, String operation, String requestJson) {
         PluginServiceCallResponse response = hostClient.callPluginService(PluginServiceCallRequest.newBuilder()
                 .setCallerPluginId(pluginId)
                 .setTargetPluginId(targetPluginId == null ? "" : targetPluginId)
+                .setTargetInstallationId(targetInstallationId == null ? "" : targetInstallationId)
                 .setOperation(operation == null ? "" : operation)
                 .setRequestJson(requestJson == null ? "{}" : requestJson)
                 .setJobId(jobId == null ? "" : jobId)

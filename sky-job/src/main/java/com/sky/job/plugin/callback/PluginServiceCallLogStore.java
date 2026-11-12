@@ -1,6 +1,7 @@
 package com.sky.job.plugin.callback;
 
 import com.sky.job.plugin.callback.mapper.PluginServiceCallLogMapper;
+import com.sky.job.security.EffectiveDataScope;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
@@ -18,18 +19,18 @@ public class PluginServiceCallLogStore {
         mapper.insert(command);
     }
 
-    public Optional<PluginServiceCallLog> findById(long id) {
-        return Optional.ofNullable(mapper.findById(id));
+    public Optional<PluginServiceCallLog> findById(long id, EffectiveDataScope scope) {
+        return Optional.ofNullable(mapper.findById(id, scope));
     }
 
-    public List<PluginServiceCallLog> list(Long jobId, String callerPluginId, String targetPluginId, String operation, Boolean success, Integer page, Integer size) {
+    public List<PluginServiceCallLog> list(Long jobId, String callerInstallationId, String callerPluginId, String targetInstallationId, String targetPluginId, String operation, Boolean success, EffectiveDataScope scope, Integer page, Integer size) {
         int normalizedPage = normalizedPage(page);
         int normalizedSize = normalizedSize(size);
-        return mapper.list(jobId, trim(callerPluginId), trim(targetPluginId), trim(operation), success, normalizedSize, (normalizedPage - 1) * normalizedSize);
+        return mapper.list(jobId, trim(callerInstallationId), trim(callerPluginId), trim(targetInstallationId), trim(targetPluginId), trim(operation), success, scope, normalizedSize, (normalizedPage - 1) * normalizedSize);
     }
 
-    public long count(Long jobId, String callerPluginId, String targetPluginId, String operation, Boolean success) {
-        return mapper.count(jobId, trim(callerPluginId), trim(targetPluginId), trim(operation), success);
+    public long count(Long jobId, String callerInstallationId, String callerPluginId, String targetInstallationId, String targetPluginId, String operation, Boolean success, EffectiveDataScope scope) {
+        return mapper.count(jobId, trim(callerInstallationId), trim(callerPluginId), trim(targetInstallationId), trim(targetPluginId), trim(operation), success, scope);
     }
 
     private String trim(String value) {

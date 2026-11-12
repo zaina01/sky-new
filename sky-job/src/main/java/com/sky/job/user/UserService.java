@@ -60,6 +60,9 @@ public class UserService {
                 request.email(),
                 blankToNull(request.phone()),
                 null,
+                1L,
+                null,
+                true,
                 true,
                 null,
                 null

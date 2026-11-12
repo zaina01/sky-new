@@ -8,6 +8,7 @@
             <arg column="role_id" javaType="java.lang.Long"/>
             <arg column="role_name" javaType="java.lang.String"/>
             <arg column="description" javaType="java.lang.String"/>
+            <arg column="data_scope" javaType="com.sky.job.security.DataScopeType"/>
             <arg column="created_at" javaType="java.time.LocalDateTime"/>
         </constructor>
     </resultMap>
@@ -60,4 +61,30 @@
     </insert>
 
     <select id="countAssigned" resultType="int">SELECT COUNT(*) FROM sky_user_role WHERE role_id = #{roleId}</select>
+
+    <update id="updateDataScope">UPDATE sky_role SET data_scope = #{dataScope} WHERE role_id = #{roleId}</update>
+    <delete id="deleteRoleDepartments">DELETE FROM sky_role_department WHERE role_id = #{roleId}</delete>
+    <insert id="assignDepartment">
+        INSERT INTO sky_role_department (role_id, department_id) VALUES (#{roleId}, #{departmentId})
+    </insert>
+    <select id="departmentIds" resultType="java.lang.Long">
+        SELECT department_id FROM sky_role_department WHERE role_id = #{roleId} ORDER BY department_id
+    </select>
+    <select id="dataScopeGrants" resultType="com.sky.job.security.RoleDataScopeGrant">
+        SELECT DISTINCT r.role_id AS roleId, r.role_name AS roleName, r.data_scope AS dataScope
+        FROM sky_role r
+        JOIN sky_user_role ur ON ur.role_id = r.role_id
+        JOIN sky_role_permission rp ON rp.role_id = r.role_id
+        JOIN sky_permission p ON p.permission_id = rp.permission_id
+        WHERE ur.user_id = #{userId} AND p.permission_name = #{permissionName}
+    </select>
+    <select id="customDepartmentIds" resultType="java.lang.Long">
+        SELECT DISTINCT rd.department_id
+        FROM sky_role_department rd
+        JOIN sky_role r ON r.role_id = rd.role_id
+        JOIN sky_user_role ur ON ur.role_id = r.role_id
+        JOIN sky_role_permission rp ON rp.role_id = r.role_id
+        JOIN sky_permission p ON p.permission_id = rp.permission_id
+        WHERE ur.user_id = #{userId} AND p.permission_name = #{permissionName} AND r.data_scope = 'CUSTOM'
+    </select>
 </mapper>

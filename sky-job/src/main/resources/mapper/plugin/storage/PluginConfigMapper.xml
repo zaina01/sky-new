@@ -6,17 +6,17 @@
     <select id="findConfigJson" resultType="java.lang.String">
         SELECT config_json
         FROM plugin_config
-        WHERE plugin_id = #{pluginId}
+        WHERE installation_id = #{installationId}
     </select>
 
     <insert id="upsertConfigJson">
-        INSERT INTO plugin_config (plugin_id, config_json)
-        VALUES (#{pluginId}, CAST(#{configJson} AS JSON))
+        INSERT INTO plugin_config (installation_id, config_json)
+        VALUES (#{installationId}, CAST(#{configJson} AS JSON))
         ON DUPLICATE KEY UPDATE config_json = VALUES(config_json), updated_at = CURRENT_TIMESTAMP
     </insert>
 
-    <delete id="deleteByPluginId">
+    <delete id="deleteByInstallationId">
         DELETE FROM plugin_config
-        WHERE plugin_id = #{pluginId}
+        WHERE installation_id = #{installationId}
     </delete>
 </mapper>

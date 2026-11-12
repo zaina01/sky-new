@@ -6,6 +6,7 @@ import java.time.LocalDateTime;
 
 public record PluginAuditLogResponse(
         Long id,
+        String installationId,
         String pluginId,
         String instanceId,
         String actor,
@@ -16,6 +17,7 @@ public record PluginAuditLogResponse(
     public static PluginAuditLogResponse from(PluginAuditLog log) {
         return new PluginAuditLogResponse(
                 log.id(),
+                log.installationId(),
                 log.pluginId(),
                 log.instanceId(),
                 log.actor(),

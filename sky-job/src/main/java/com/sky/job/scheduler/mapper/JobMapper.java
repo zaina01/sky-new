@@ -5,6 +5,7 @@ import org.apache.ibatis.annotations.Param;
 
 import java.util.List;
 import java.util.Map;
+import com.sky.job.security.EffectiveDataScope;
 
 public interface JobMapper {
     int insert(Map<String, Object> values);
@@ -12,7 +13,7 @@ public interface JobMapper {
     int update(
             @Param("id") long id,
             @Param("jobName") String jobName,
-            @Param("pluginId") String pluginId,
+            @Param("pluginInstallationId") String pluginInstallationId,
             @Param("cronExpression") String cronExpression,
             @Param("misfirePolicy") String misfirePolicy,
             @Param("concurrent") boolean concurrent,
@@ -22,19 +23,21 @@ public interface JobMapper {
             @Param("actor") String actor
     );
 
-    ScheduledJobRow findById(@Param("id") long id);
+    ScheduledJobRow findById(@Param("id") long id, @Param("scope") EffectiveDataScope scope);
 
-    List<ScheduledJobRow> list(@Param("limit") int limit, @Param("offset") int offset);
+    ScheduledJobRow findByIdUnscoped(@Param("id") long id);
 
-    long count();
+    List<ScheduledJobRow> list(@Param("scope") EffectiveDataScope scope, @Param("limit") int limit, @Param("offset") int offset);
 
-    long countByPluginId(@Param("pluginId") String pluginId);
+    long count(@Param("scope") EffectiveDataScope scope);
 
-    long countByStatus(@Param("status") String status);
+    long countByPluginInstallationId(@Param("pluginInstallationId") String pluginInstallationId);
 
-    List<StatusCountRow> countByJobStatus();
+    long countByStatus(@Param("status") String status, @Param("scope") EffectiveDataScope scope);
 
-    List<StatusCountRow> countByExecutedStatus();
+    List<StatusCountRow> countByJobStatus(@Param("scope") EffectiveDataScope scope);
+
+    List<StatusCountRow> countByExecutedStatus(@Param("scope") EffectiveDataScope scope);
 
     int delete(@Param("id") long id);
 
@@ -49,4 +52,12 @@ public interface JobMapper {
     int resetRunningToIdle(@Param("idleStatus") String idleStatus, @Param("runningStatus") String runningStatus);
 
     List<ScheduledJobRow> findEnabledJobs(@Param("enabledStatus") String enabledStatus);
+
+    List<String> notificationChannelIds(@Param("jobId") long jobId);
+
+    int deleteNotificationChannels(@Param("jobId") long jobId);
+
+    int insertNotificationChannel(@Param("jobId") long jobId, @Param("channelId") String channelId, @Param("createdBy") String createdBy);
+
+    int transferOwnership(@Param("id") long id, @Param("ownerUserId") String ownerUserId, @Param("ownerDepartmentId") Long ownerDepartmentId, @Param("actor") String actor);
 }

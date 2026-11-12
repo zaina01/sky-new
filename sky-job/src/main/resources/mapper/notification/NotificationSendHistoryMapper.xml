@@ -1,32 +1,26 @@
 <?xml version="1.0" encoding="UTF-8" ?>
-<!DOCTYPE mapper
-        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
-        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="com.sky.job.notification.mapper.NotificationSendHistoryMapper">
     <resultMap id="StatusCountRowResultMap" type="com.sky.job.common.mapper.StatusCountRow">
-        <constructor>
-            <arg column="status" javaType="java.lang.String"/>
-            <arg column="total" javaType="_long"/>
-        </constructor>
+        <constructor><arg column="status" javaType="java.lang.String"/><arg column="total" javaType="_long"/></constructor>
     </resultMap>
-
     <resultMap id="DailyStatusCountRowResultMap" type="com.sky.job.common.mapper.DailyStatusCountRow">
-        <constructor>
-            <arg column="bucket_date" javaType="java.time.LocalDate"/>
-            <arg column="status" javaType="java.lang.String"/>
-            <arg column="total" javaType="_long"/>
-        </constructor>
+        <constructor><arg column="bucket_date" javaType="java.time.LocalDate"/><arg column="status" javaType="java.lang.String"/><arg column="total" javaType="_long"/></constructor>
     </resultMap>
-
     <resultMap id="NotificationSendHistoryRowResultMap" type="com.sky.job.notification.mapper.NotificationSendHistoryRow">
         <constructor>
             <arg column="id" javaType="_long"/>
             <arg column="request_id" javaType="java.lang.String"/>
             <arg column="source_type" javaType="java.lang.String"/>
+            <arg column="installation_id" javaType="java.lang.String"/>
             <arg column="plugin_id" javaType="java.lang.String"/>
             <arg column="instance_id" javaType="java.lang.String"/>
             <arg column="job_id" javaType="java.lang.String"/>
             <arg column="execution_id" javaType="java.lang.Long"/>
+            <arg column="source_owner_user_id" javaType="java.lang.String"/>
+            <arg column="source_owner_dept_id" javaType="java.lang.Long"/>
+            <arg column="channel_owner_user_id" javaType="java.lang.String"/>
+            <arg column="channel_owner_dept_id" javaType="java.lang.Long"/>
             <arg column="channel_id" javaType="java.lang.String"/>
             <arg column="channel_type" javaType="java.lang.String"/>
             <arg column="title" javaType="java.lang.String"/>
@@ -56,153 +50,124 @@
         </constructor>
     </resultMap>
 
+    <sql id="scope">
+        <if test="scope != null and !scope.all">
+            AND <choose>
+                <when test="scope.denied">1=0</when>
+                <otherwise>
+                    h.source_owner_user_id IS NOT NULL AND (
+                    <if test="scope.departmentIds != null and !scope.departmentIds.isEmpty()">
+                        h.source_owner_dept_id IN <foreach collection="scope.departmentIds" item="deptId" open="(" separator="," close=")">#{deptId}</foreach>
+                        OR h.channel_owner_dept_id IN <foreach collection="scope.departmentIds" item="channelDeptId" open="(" separator="," close=")">#{channelDeptId}</foreach>
+                    </if>
+                    <if test="scope.self">
+                        <if test="scope.departmentIds != null and !scope.departmentIds.isEmpty()"> OR </if>
+                        h.source_owner_user_id=#{scope.userId} OR h.channel_owner_user_id=#{scope.userId}
+                    </if>
+                    )
+                </otherwise>
+            </choose>
+        </if>
+    </sql>
+
     <insert id="insertPending" useGeneratedKeys="true" keyProperty="id">
         INSERT INTO notification_send_history (
-            request_id, source_type, plugin_id, instance_id, job_id, execution_id, channel_id, channel_type,
-            title, severity, content_preview, content_payload, payload_bytes, labels_json, status, max_attempts
+            request_id, source_type, installation_id, plugin_id, instance_id, job_id, execution_id,
+            source_owner_user_id, source_owner_dept_id, channel_owner_user_id, channel_owner_dept_id,
+            channel_id, channel_type, title, severity, content_preview, content_payload, payload_bytes,
+            labels_json, status, max_attempts
         ) VALUES (
-            #{requestId}, #{sourceType}, #{pluginId}, #{instanceId}, #{jobId}, #{executionId}, #{channelId}, #{channelType},
-            #{title}, #{severity}, #{contentPreview}, #{contentPayload}, #{payloadBytes}, CAST(#{labelsJson} AS JSON), #{status}, #{maxAttempts}
+            #{requestId}, #{sourceType}, #{installationId}, #{pluginId}, #{instanceId}, #{jobId}, #{executionId},
+            #{sourceOwnerUserId}, #{sourceOwnerDepartmentId}, #{channelOwnerUserId}, #{channelOwnerDepartmentId},
+            #{channelId}, #{channelType}, #{title}, #{severity}, #{contentPreview}, #{contentPayload}, #{payloadBytes},
+            CAST(#{labelsJson} AS JSON), #{status}, #{maxAttempts}
         )
     </insert>
-
     <update id="restoreStaleSending">
-        UPDATE notification_send_history
-        SET status = #{retryWaitingStatus}, next_retry_at = #{now}, locked_at = NULL, locked_by = NULL, error_type = #{errorType}, error_message = #{errorMessage}, updated_at = CURRENT_TIMESTAMP(3)
-        WHERE status = #{sendingStatus} AND locked_at &lt; #{staleBefore}
+        UPDATE notification_send_history SET status=#{retryWaitingStatus}, next_retry_at=#{now}, locked_at=NULL,
+            locked_by=NULL, error_type=#{errorType}, error_message=#{errorMessage}, updated_at=CURRENT_TIMESTAMP(3)
+        WHERE status=#{sendingStatus} AND locked_at &lt; #{staleBefore}
     </update>
-
     <select id="listDueIds" resultType="long">
-        SELECT id
-        FROM notification_send_history
-        WHERE status IN (#{pendingStatus}, #{retryWaitingStatus})
-          AND (next_retry_at IS NULL OR next_retry_at &lt;= #{now})
-          AND attempt_count &lt; max_attempts
-        ORDER BY COALESCE(next_retry_at, created_at), id
-        LIMIT #{limit}
+        SELECT id FROM notification_send_history WHERE status IN (#{pendingStatus}, #{retryWaitingStatus})
+          AND (next_retry_at IS NULL OR next_retry_at &lt;= #{now}) AND attempt_count &lt; max_attempts
+        ORDER BY COALESCE(next_retry_at, created_at), id LIMIT #{limit}
     </select>
-
     <update id="claimDue">
-        UPDATE notification_send_history
-        SET status = #{sendingStatus}, locked_by = #{workerId}, locked_at = #{now}, last_attempt_at = #{now}, first_attempt_at = COALESCE(first_attempt_at, #{now}), updated_at = CURRENT_TIMESTAMP(3)
-        WHERE id = #{id} AND status IN (#{pendingStatus}, #{retryWaitingStatus}) AND (next_retry_at IS NULL OR next_retry_at &lt;= #{now}) AND attempt_count &lt; max_attempts
+        UPDATE notification_send_history SET status=#{sendingStatus}, locked_by=#{workerId}, locked_at=#{now},
+            last_attempt_at=#{now}, first_attempt_at=COALESCE(first_attempt_at, #{now}), updated_at=CURRENT_TIMESTAMP(3)
+        WHERE id=#{id} AND status IN (#{pendingStatus}, #{retryWaitingStatus})
+          AND (next_retry_at IS NULL OR next_retry_at &lt;= #{now}) AND attempt_count &lt; max_attempts
     </update>
-
     <update id="markSendingSuccess">
-        UPDATE notification_send_history
-        SET status = #{successStatus}, attempt_count = attempt_count + 1, next_retry_at = NULL, locked_at = NULL, locked_by = NULL,
-            error_type = NULL, error_message = NULL, provider_status_code = #{providerStatusCode}, provider_message = #{providerMessage}, sent_at = CURRENT_TIMESTAMP(3), updated_at = CURRENT_TIMESTAMP(3)
-        WHERE id = #{id}
+        UPDATE notification_send_history SET status=#{successStatus}, attempt_count=attempt_count+1, next_retry_at=NULL,
+            locked_at=NULL, locked_by=NULL, error_type=NULL, error_message=NULL, provider_status_code=#{providerStatusCode},
+            provider_message=#{providerMessage}, sent_at=CURRENT_TIMESTAMP(3), updated_at=CURRENT_TIMESTAMP(3) WHERE id=#{id}
     </update>
-
     <update id="markSendingRetry">
-        UPDATE notification_send_history
-        SET status = #{retryWaitingStatus}, attempt_count = attempt_count + 1, next_retry_at = #{nextRetryAt}, locked_at = NULL, locked_by = NULL,
-            error_type = #{errorType}, error_message = #{errorMessage}, provider_status_code = #{providerStatusCode}, provider_message = #{providerMessage}, updated_at = CURRENT_TIMESTAMP(3)
-        WHERE id = #{id}
+        UPDATE notification_send_history SET status=#{retryWaitingStatus}, attempt_count=attempt_count+1,
+            next_retry_at=#{nextRetryAt}, locked_at=NULL, locked_by=NULL, error_type=#{errorType}, error_message=#{errorMessage},
+            provider_status_code=#{providerStatusCode}, provider_message=#{providerMessage}, updated_at=CURRENT_TIMESTAMP(3) WHERE id=#{id}
     </update>
-
     <update id="markSendingFinalFailed">
-        UPDATE notification_send_history
-        SET status = #{failedStatus}, attempt_count = attempt_count + 1, next_retry_at = NULL, locked_at = NULL, locked_by = NULL,
-            error_type = #{errorType}, error_message = #{errorMessage}, provider_status_code = #{providerStatusCode}, provider_message = #{providerMessage}, sent_at = CURRENT_TIMESTAMP(3), updated_at = CURRENT_TIMESTAMP(3)
-        WHERE id = #{id}
+        UPDATE notification_send_history SET status=#{failedStatus}, attempt_count=attempt_count+1, next_retry_at=NULL,
+            locked_at=NULL, locked_by=NULL, error_type=#{errorType}, error_message=#{errorMessage},
+            provider_status_code=#{providerStatusCode}, provider_message=#{providerMessage}, sent_at=CURRENT_TIMESTAMP(3),
+            updated_at=CURRENT_TIMESTAMP(3) WHERE id=#{id}
     </update>
-
     <update id="requestManualRetry">
-        UPDATE notification_send_history
-        SET status = #{pendingStatus}, attempt_count = 0, next_retry_at = #{now}, locked_at = NULL, locked_by = NULL,
-            manual_retry_count = manual_retry_count + 1, last_manual_retry_at = #{now}, last_manual_retry_by = #{actor}, sent_at = NULL, updated_at = CURRENT_TIMESTAMP(3)
-        WHERE id = #{id} AND status = #{failedStatus} AND content_payload IS NOT NULL
+        UPDATE notification_send_history SET status=#{pendingStatus}, attempt_count=0, next_retry_at=#{now},
+            locked_at=NULL, locked_by=NULL, manual_retry_count=manual_retry_count+1,
+            last_manual_retry_at=#{now}, last_manual_retry_by=#{actor}, sent_at=NULL, updated_at=CURRENT_TIMESTAMP(3)
+        WHERE id=#{id} AND status=#{failedStatus} AND content_payload IS NOT NULL
     </update>
-
     <update id="markSkipped">
-        UPDATE notification_send_history
-        SET status = #{skippedStatus}, error_type = 'SKIPPED', error_message = #{message}, sent_at = CURRENT_TIMESTAMP(3), updated_at = CURRENT_TIMESTAMP(3)
-        WHERE id = #{id}
+        UPDATE notification_send_history SET status=#{skippedStatus}, error_type='SKIPPED', error_message=#{message},
+            sent_at=CURRENT_TIMESTAMP(3), updated_at=CURRENT_TIMESTAMP(3) WHERE id=#{id}
     </update>
 
     <sql id="filters">
-        <where>
-            <if test="sourceType != null">
-                source_type = #{sourceType}
-            </if>
-            <if test="channelId != null and channelId != ''">
-                AND channel_id = #{channelId}
-            </if>
-            <if test="channelType != null">
-                AND channel_type = #{channelType}
-            </if>
-            <if test="status != null">
-                AND status = #{status}
-            </if>
-            <if test="pluginId != null and pluginId != ''">
-                AND plugin_id = #{pluginId}
-            </if>
-            <if test="jobId != null and jobId != ''">
-                AND job_id = #{jobId}
-            </if>
-            <if test="executionId != null">
-                AND execution_id = #{executionId}
-            </if>
-            <if test="startTime != null">
-                AND created_at &gt;= #{startTime}
-            </if>
-            <if test="endTime != null">
-                AND created_at &lt;= #{endTime}
-            </if>
-        </where>
+        <if test="sourceType != null">AND h.source_type=#{sourceType}</if>
+        <if test="channelId != null and channelId != ''">AND h.channel_id=#{channelId}</if>
+        <if test="channelType != null">AND h.channel_type=#{channelType}</if>
+        <if test="status != null">AND h.status=#{status}</if>
+        <if test="installationId != null and installationId != ''">AND h.installation_id=#{installationId}</if>
+        <if test="pluginId != null and pluginId != ''">AND h.plugin_id=#{pluginId}</if>
+        <if test="jobId != null and jobId != ''">AND h.job_id=#{jobId}</if>
+        <if test="executionId != null">AND h.execution_id=#{executionId}</if>
+        <if test="startTime != null">AND h.created_at &gt;= #{startTime}</if>
+        <if test="endTime != null">AND h.created_at &lt;= #{endTime}</if>
+        <include refid="scope"/>
     </sql>
-
     <select id="list" resultMap="NotificationSendHistoryRowResultMap">
-        SELECT *
-        FROM notification_send_history
-        <include refid="filters"/>
-        ORDER BY created_at DESC, id DESC
-        LIMIT #{limit} OFFSET #{offset}
+        SELECT h.* FROM notification_send_history h <where><include refid="filters"/></where>
+        ORDER BY h.created_at DESC, h.id DESC LIMIT #{limit} OFFSET #{offset}
     </select>
-
     <select id="count" resultType="long">
-        SELECT COUNT(*)
-        FROM notification_send_history
-        <include refid="filters"/>
+        SELECT COUNT(*) FROM notification_send_history h <where><include refid="filters"/></where>
     </select>
-
     <select id="findById" resultMap="NotificationSendHistoryRowResultMap">
-        SELECT * FROM notification_send_history WHERE id = #{id}
+        SELECT h.* FROM notification_send_history h <where>h.id=#{id}<include refid="scope"/></where>
     </select>
-
-    <select id="countOlderThan" resultType="long">
-        SELECT COUNT(*) FROM notification_send_history WHERE created_at &lt; #{cutoff}
+    <select id="findByIdUnscoped" resultMap="NotificationSendHistoryRowResultMap">
+        SELECT h.* FROM notification_send_history h WHERE h.id=#{id}
     </select>
-
+    <select id="countOlderThan" resultType="long">SELECT COUNT(*) FROM notification_send_history WHERE created_at &lt; #{cutoff}</select>
     <select id="countByStatusBetween" resultMap="StatusCountRowResultMap">
-        SELECT status AS status, COUNT(*) AS total
-        FROM notification_send_history
-        WHERE created_at &gt;= #{startTime} AND created_at &lt; #{endTime}
-        GROUP BY status
+        SELECT h.status AS status, COUNT(*) AS total FROM notification_send_history h
+        <where>h.created_at &gt;= #{startTime} AND h.created_at &lt; #{endTime}<include refid="scope"/></where>
+        GROUP BY h.status
     </select>
-
     <select id="countDailyByStatus" resultMap="DailyStatusCountRowResultMap">
-        SELECT DATE(created_at) AS bucket_date, status AS status, COUNT(*) AS total
-        FROM notification_send_history
-        WHERE created_at &gt;= #{startTime} AND created_at &lt; #{endTime}
-        GROUP BY DATE(created_at), status
-        ORDER BY bucket_date ASC, status ASC
+        SELECT DATE(h.created_at) AS bucket_date, h.status AS status, COUNT(*) AS total FROM notification_send_history h
+        <where>h.created_at &gt;= #{startTime} AND h.created_at &lt; #{endTime}<include refid="scope"/></where>
+        GROUP BY DATE(h.created_at), h.status ORDER BY bucket_date ASC, status ASC
     </select>
-
     <select id="listRecentFailures" resultMap="NotificationSendHistoryRowResultMap">
-        SELECT *
-        FROM notification_send_history
-        WHERE status = #{failedStatus}
-        ORDER BY created_at DESC, id DESC
-        LIMIT #{limit}
+        SELECT h.* FROM notification_send_history h <where>h.status=#{failedStatus}<include refid="scope"/></where>
+        ORDER BY h.created_at DESC, h.id DESC LIMIT #{limit}
     </select>
-
     <delete id="deleteOlderThan">
-        DELETE FROM notification_send_history
-        WHERE created_at &lt; #{cutoff}
-        ORDER BY id
-        LIMIT #{limit}
+        DELETE FROM notification_send_history WHERE created_at &lt; #{cutoff} ORDER BY id LIMIT #{limit}
     </delete>
 </mapper>

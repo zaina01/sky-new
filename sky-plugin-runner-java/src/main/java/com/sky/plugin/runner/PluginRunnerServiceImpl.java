@@ -111,7 +111,9 @@ class PluginRunnerServiceImpl extends PluginRunnerServiceGrpc.PluginRunnerServic
                     request.getOperation(),
                     request.getRequestJson(),
                     request.getRequestId(),
-                    request.getTimeoutMillis()
+                    request.getTimeoutMillis(),
+                    request.getCallerInstallationId(),
+                    request.getTargetInstallationId()
             ), context);
             send(responseObserver, PluginServiceRunResponse.newBuilder()
                     .setSuccess(response.success())

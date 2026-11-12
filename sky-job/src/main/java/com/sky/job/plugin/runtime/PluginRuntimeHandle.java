@@ -3,6 +3,8 @@ package com.sky.job.plugin.runtime;
 import java.nio.file.Path;
 
 public interface PluginRuntimeHandle {
+    String installationId();
+
     String pluginId();
 
     String instanceId();

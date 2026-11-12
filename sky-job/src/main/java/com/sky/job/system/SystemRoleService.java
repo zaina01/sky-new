@@ -4,8 +4,10 @@ import com.sky.job.audit.SystemLogStore;
 import com.sky.job.scheduler.dto.PageResponse;
 import com.sky.job.security.PermissionNames;
 import com.sky.job.system.dto.ReplaceRolePermissionsRequest;
+import com.sky.job.system.dto.ReplaceRoleDataScopeRequest;
 import com.sky.job.system.dto.RoleResponse;
 import com.sky.job.system.dto.UpsertRoleRequest;
+import com.sky.job.web.ResourceNotFoundException;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -32,11 +34,13 @@ public class SystemRoleService {
 
     private final RoleStore roleStore;
     private final PermissionStore permissionStore;
+    private final DepartmentStore departmentStore;
     private final SystemLogStore systemLogStore;
 
-    public SystemRoleService(RoleStore roleStore, PermissionStore permissionStore, SystemLogStore systemLogStore) {
+    public SystemRoleService(RoleStore roleStore, PermissionStore permissionStore, DepartmentStore departmentStore, SystemLogStore systemLogStore) {
         this.roleStore = roleStore;
         this.permissionStore = permissionStore;
+        this.departmentStore = departmentStore;
         this.systemLogStore = systemLogStore;
     }
 
@@ -98,6 +102,28 @@ public class SystemRoleService {
     }
 
     @Transactional
+    public RoleResponse replaceDataScope(Long roleId, ReplaceRoleDataScopeRequest request, HttpServletRequest httpRequest) {
+        Role role = requireRole(roleId);
+        com.sky.job.security.DataScopeType dataScope = request == null || request.dataScope() == null ? com.sky.job.security.DataScopeType.SELF : request.dataScope();
+        Set<Long> departmentIds = request == null || request.departmentIds() == null ? Set.of() : Set.copyOf(request.departmentIds());
+        if (ADMIN_ROLE.equals(role.roleName()) && dataScope != com.sky.job.security.DataScopeType.ALL) {
+            throw new IllegalStateException("ADMIN role data scope must remain ALL");
+        }
+        if (dataScope != com.sky.job.security.DataScopeType.CUSTOM && !departmentIds.isEmpty()) {
+            throw new IllegalArgumentException("Department ids are only valid for CUSTOM data scope");
+        }
+        if (dataScope == com.sky.job.security.DataScopeType.CUSTOM && departmentIds.isEmpty()) {
+            throw new IllegalArgumentException("CUSTOM data scope requires departments");
+        }
+        for (Long departmentId : departmentIds) {
+            if (departmentStore.findById(departmentId).isEmpty()) throw new ResourceNotFoundException("Department not found: " + departmentId);
+        }
+        roleStore.replaceDataScope(roleId, dataScope, departmentIds);
+        systemLogStore.record("SYSTEM_ROLE", "ASSIGN_DATA_SCOPE", "INFO", "SUCCESS", "ROLE", String.valueOf(roleId), "Role data scope replaced", httpRequest);
+        return get(roleId);
+    }
+
+    @Transactional
     public void delete(Long roleId, HttpServletRequest httpRequest) {
         Role role = requireRole(roleId);
         if (ADMIN_ROLE.equals(role.roleName())) {
@@ -113,7 +139,7 @@ public class SystemRoleService {
     }
 
     private RoleResponse response(Role role) {
-        return RoleResponse.from(role, roleStore.permissions(role.roleId()));
+        return RoleResponse.from(role, roleStore.permissions(role.roleId()), roleStore.departmentIds(role.roleId()));
     }
 
     private Role requireRole(Long roleId) {

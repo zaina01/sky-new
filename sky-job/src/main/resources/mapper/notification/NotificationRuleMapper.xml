@@ -1,7 +1,5 @@
 <?xml version="1.0" encoding="UTF-8" ?>
-<!DOCTYPE mapper
-        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
-        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="com.sky.job.notification.mapper.NotificationRuleMapper">
     <resultMap id="NotificationRuleRowResultMap" type="com.sky.job.notification.mapper.NotificationRuleRow">
         <constructor>
@@ -10,11 +8,15 @@
             <arg column="display_name" javaType="java.lang.String"/>
             <arg column="enabled" javaType="_boolean"/>
             <arg column="event_type" javaType="java.lang.String"/>
+            <arg column="plugin_installation_id" javaType="java.lang.String"/>
             <arg column="plugin_id" javaType="java.lang.String"/>
             <arg column="job_id" javaType="java.lang.String"/>
             <arg column="severity" javaType="java.lang.String"/>
-            <arg column="channel_ids_json" javaType="java.lang.String"/>
             <arg column="remark" javaType="java.lang.String"/>
+            <arg column="owner_user_id" javaType="java.lang.String"/>
+            <arg column="owner_username" javaType="java.lang.String"/>
+            <arg column="owner_department_id" javaType="java.lang.Long"/>
+            <arg column="owner_department_name" javaType="java.lang.String"/>
             <arg column="created_by" javaType="java.lang.String"/>
             <arg column="updated_by" javaType="java.lang.String"/>
             <arg column="created_at" javaType="java.time.LocalDateTime"/>
@@ -22,72 +24,95 @@
         </constructor>
     </resultMap>
 
+    <sql id="columns">
+        r.id, r.rule_id, r.display_name, r.enabled, r.event_type, r.plugin_installation_id,
+        COALESCE(i.plugin_id, '') AS plugin_id, CAST(r.job_id AS CHAR) AS job_id, r.severity, r.remark,
+        r.owner_user_id, u.username AS owner_username, r.owner_dept_id AS owner_department_id,
+        d.department_name AS owner_department_name, r.created_by, r.updated_by, r.created_at, r.updated_at
+    </sql>
+    <sql id="joins">
+        FROM notification_rule r
+        LEFT JOIN plugin_installation i ON i.installation_id=r.plugin_installation_id
+        LEFT JOIN sky_user u ON u.user_id=r.owner_user_id
+        JOIN sky_department d ON d.department_id=r.owner_dept_id
+    </sql>
+    <sql id="scope">
+        <if test="scope != null and !scope.all">
+            AND <choose>
+                <when test="scope.denied">1=0</when>
+                <otherwise>(
+                    <if test="scope.departmentIds != null and !scope.departmentIds.isEmpty()">
+                        r.owner_dept_id IN <foreach collection="scope.departmentIds" item="deptId" open="(" separator="," close=")">#{deptId}</foreach>
+                    </if>
+                    <if test="scope.self">
+                        <if test="scope.departmentIds != null and !scope.departmentIds.isEmpty()"> OR </if>
+                        r.owner_user_id=#{scope.userId}
+                    </if>
+                )</otherwise>
+            </choose>
+        </if>
+    </sql>
     <sql id="filters">
-        <where>
-            <if test="eventType != null">
-                event_type = #{eventType}
-            </if>
-            <if test="enabled != null">
-                AND enabled = #{enabled}
-            </if>
-            <if test="pluginId != null and pluginId != ''">
-                AND plugin_id = #{pluginId}
-            </if>
-            <if test="jobId != null and jobId != ''">
-                AND job_id = #{jobId}
-            </if>
-        </where>
+        <if test="eventType != null">AND r.event_type=#{eventType}</if>
+        <if test="enabled != null">AND r.enabled=#{enabled}</if>
+        <if test="pluginInstallationId != null and pluginInstallationId != ''">AND r.plugin_installation_id=#{pluginInstallationId}</if>
+        <if test="jobId != null and jobId != ''">AND r.job_id=#{jobId}</if>
+        <include refid="scope"/>
     </sql>
 
     <select id="list" resultMap="NotificationRuleRowResultMap">
-        SELECT *
-        FROM notification_rule
-        <include refid="filters"/>
-        ORDER BY id DESC
-        LIMIT #{limit} OFFSET #{offset}
+        SELECT <include refid="columns"/> <include refid="joins"/>
+        <where><include refid="filters"/></where> ORDER BY r.id DESC LIMIT #{limit} OFFSET #{offset}
     </select>
-
     <select id="count" resultType="long">
-        SELECT COUNT(*)
-        FROM notification_rule
-        <include refid="filters"/>
+        SELECT COUNT(*) <include refid="joins"/> <where><include refid="filters"/></where>
     </select>
-
     <select id="findByRuleId" resultMap="NotificationRuleRowResultMap">
-        SELECT * FROM notification_rule WHERE rule_id = #{ruleId}
+        SELECT <include refid="columns"/> <include refid="joins"/>
+        <where>r.rule_id=#{ruleId}<include refid="scope"/></where>
+    </select>
+    <select id="findByRuleIdUnscoped" resultMap="NotificationRuleRowResultMap">
+        SELECT <include refid="columns"/> <include refid="joins"/> WHERE r.rule_id=#{ruleId}
     </select>
 
     <insert id="insert">
-        INSERT INTO notification_rule (rule_id, display_name, enabled, event_type, plugin_id, job_id, severity, channel_ids_json, remark, created_by, updated_by)
-        VALUES (#{ruleId}, #{displayName}, #{enabled}, #{eventType}, #{pluginId}, #{jobId}, #{severity}, CAST(#{channelIdsJson} AS JSON), #{remark}, #{createdBy}, #{createdBy})
+        INSERT INTO notification_rule (
+            rule_id, display_name, enabled, event_type, plugin_installation_id, job_id,
+            severity, remark, owner_user_id, owner_dept_id, created_by, updated_by
+        ) VALUES (
+            #{ruleId}, #{displayName}, #{enabled}, #{eventType}, NULLIF(#{pluginInstallationId}, ''), NULLIF(#{jobId}, ''),
+            #{severity}, #{remark}, #{ownerUserId}, #{ownerDepartmentId}, #{createdBy}, #{createdBy}
+        )
     </insert>
-
     <update id="update">
-        UPDATE notification_rule
-        SET display_name = #{displayName}, enabled = #{enabled}, event_type = #{eventType}, plugin_id = #{pluginId}, job_id = #{jobId}, severity = #{severity}, channel_ids_json = CAST(#{channelIdsJson} AS JSON), remark = #{remark}, updated_by = #{updatedBy}, updated_at = CURRENT_TIMESTAMP
-        WHERE rule_id = #{ruleId}
+        UPDATE notification_rule SET display_name=#{displayName}, enabled=#{enabled}, event_type=#{eventType},
+            plugin_installation_id=NULLIF(#{pluginInstallationId}, ''), job_id=NULLIF(#{jobId}, ''), severity=#{severity},
+            remark=#{remark}, updated_by=#{updatedBy}, updated_at=CURRENT_TIMESTAMP WHERE rule_id=#{ruleId}
     </update>
-
     <update id="updateEnabled">
-        UPDATE notification_rule
-        SET enabled = #{enabled}, updated_by = #{updatedBy}, updated_at = CURRENT_TIMESTAMP
-        WHERE rule_id = #{ruleId}
+        UPDATE notification_rule SET enabled=#{enabled}, updated_by=#{updatedBy}, updated_at=CURRENT_TIMESTAMP WHERE rule_id=#{ruleId}
     </update>
-
-    <delete id="delete">DELETE FROM notification_rule WHERE rule_id = #{ruleId}</delete>
+    <delete id="delete">DELETE FROM notification_rule WHERE rule_id=#{ruleId}</delete>
 
     <select id="listEnabledCandidates" resultMap="NotificationRuleRowResultMap">
-        SELECT *
-        FROM notification_rule
-        WHERE enabled = TRUE
-          AND event_type = #{eventType}
-          AND (plugin_id = '' OR plugin_id = #{pluginId})
-          AND (job_id = '' OR job_id = #{jobId})
-          AND (severity = '' OR severity = #{severity})
-        ORDER BY
-          CASE WHEN plugin_id &lt;&gt; '' THEN 1 ELSE 0 END DESC,
-          CASE WHEN job_id &lt;&gt; '' THEN 1 ELSE 0 END DESC,
-          CASE WHEN severity &lt;&gt; '' THEN 1 ELSE 0 END DESC,
-          id ASC
+        SELECT <include refid="columns"/> <include refid="joins"/>
+        WHERE r.enabled=TRUE AND r.event_type=#{eventType}
+          AND (r.plugin_installation_id IS NULL OR r.plugin_installation_id=#{pluginInstallationId})
+          AND (r.job_id IS NULL OR r.job_id=#{jobId})
+          AND (r.severity='' OR r.severity=#{severity})
+        ORDER BY (r.plugin_installation_id IS NOT NULL) DESC, (r.job_id IS NOT NULL) DESC,
+                 (r.severity &lt;&gt; '') DESC, r.id ASC
     </select>
+
+    <select id="channelIds" resultType="java.lang.String">
+        SELECT channel_id FROM notification_rule_channel WHERE rule_id=#{ruleId} ORDER BY channel_id
+    </select>
+    <delete id="deleteChannels">DELETE FROM notification_rule_channel WHERE rule_id=#{ruleId}</delete>
+    <insert id="insertChannel">
+        INSERT INTO notification_rule_channel (rule_id, channel_id, created_by) VALUES (#{ruleId}, #{channelId}, #{createdBy})
+    </insert>
+    <update id="transferOwnership">
+        UPDATE notification_rule SET owner_user_id=#{ownerUserId}, owner_dept_id=#{ownerDepartmentId},
+            updated_by=#{updatedBy}, updated_at=CURRENT_TIMESTAMP WHERE rule_id=#{ruleId}
+    </update>
 </mapper>

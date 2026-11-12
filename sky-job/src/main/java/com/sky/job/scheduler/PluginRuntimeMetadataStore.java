@@ -20,6 +20,9 @@ import java.util.EnumSet;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
+import java.util.Map;
+import java.util.HashMap;
+import com.sky.job.security.EffectiveDataScope;
 
 @Repository
 @EnableConfigurationProperties(PluginDependencyResolutionProperties.class)
@@ -34,46 +37,46 @@ public class PluginRuntimeMetadataStore {
         this.dependencyProperties = dependencyProperties;
     }
 
-    public Optional<PluginRuntimeMetadata> findByPluginId(String pluginId) {
-        return Optional.ofNullable(mapper.findByPluginId(pluginId)).map(this::map);
+    public Optional<PluginRuntimeMetadata> findByInstallationId(String installationId) {
+        return Optional.ofNullable(mapper.findByInstallationId(installationId)).map(this::map);
     }
 
-    public Optional<PluginRuntimeRecord> findRuntimeByPluginId(String pluginId) {
-        return Optional.ofNullable(mapper.findByPluginId(pluginId)).map(this::mapRuntime);
+    public Optional<PluginRuntimeRecord> findRuntimeByInstallationId(String installationId) {
+        return Optional.ofNullable(mapper.findByInstallationId(installationId)).map(this::mapRuntime);
     }
 
-    public List<PluginRuntimeRecord> listRuntimes(String pluginId, PluginRuntimeState state, Integer page, Integer size) {
+    public List<PluginRuntimeRecord> listRuntimes(String pluginId, PluginRuntimeState state, EffectiveDataScope scope, Integer page, Integer size) {
         int normalizedPage = Math.max(page == null ? 1 : page, 1);
         int normalizedSize = Math.min(Math.max(size == null ? 20 : size, 1), 100);
         String stateName = state == null ? null : state.name();
-        return mapper.listRuntimes(trim(pluginId), stateName, normalizedSize, (normalizedPage - 1) * normalizedSize).stream()
+        return mapper.listRuntimes(trim(pluginId), stateName, scope, normalizedSize, (normalizedPage - 1) * normalizedSize).stream()
                 .map(this::mapRuntime)
                 .toList();
     }
 
-    public long countRuntimes(String pluginId, PluginRuntimeState state) {
-        return mapper.countRuntimes(trim(pluginId), state == null ? null : state.name());
+    public long countRuntimes(String pluginId, PluginRuntimeState state, EffectiveDataScope scope) {
+        return mapper.countRuntimes(trim(pluginId), state == null ? null : state.name(), scope);
     }
 
-    public List<StatusCountRow> countRuntimesByState() {
-        return mapper.countRuntimesByState();
+    public List<StatusCountRow> countRuntimesByState(EffectiveDataScope scope) {
+        return mapper.countRuntimesByState(scope);
     }
 
-    public List<PluginRuntimeRecord> listOptions(String keyword, PluginRuntimeState state, PluginOptionUsage usage, Integer page, Integer size) {
+    public List<PluginRuntimeRecord> listOptions(String keyword, PluginRuntimeState state, PluginOptionUsage usage, EffectiveDataScope scope, Integer page, Integer size) {
         int normalizedPage = Math.max(page == null ? 1 : page, 1);
         int normalizedSize = Math.min(Math.max(size == null ? 20 : size, 1), 100);
-        return mapper.listOptions(trim(keyword), like(keyword), state == null ? null : state.name(), usage == null ? null : usage.name(), normalizedSize, (normalizedPage - 1) * normalizedSize).stream()
+        return mapper.listOptions(trim(keyword), like(keyword), state == null ? null : state.name(), usage == null ? null : usage.name(), scope, normalizedSize, (normalizedPage - 1) * normalizedSize).stream()
                 .map(this::mapRuntime)
                 .toList();
     }
 
-    public long countOptions(String keyword, PluginRuntimeState state, PluginOptionUsage usage) {
-        return mapper.countOptions(trim(keyword), like(keyword), state == null ? null : state.name(), usage == null ? null : usage.name());
+    public long countOptions(String keyword, PluginRuntimeState state, PluginOptionUsage usage, EffectiveDataScope scope) {
+        return mapper.countOptions(trim(keyword), like(keyword), state == null ? null : state.name(), usage == null ? null : usage.name(), scope);
     }
 
-    public void updateLifecycle(String pluginId, PluginRuntimeState state, String runnerHost, Integer runnerPort, Path workDir) {
+    public void updateLifecycle(String installationId, PluginRuntimeState state, String runnerHost, Integer runnerPort, Path workDir) {
         mapper.updateLifecycle(
-                pluginId,
+                installationId,
                 state.name(),
                 runnerHost == null ? "127.0.0.1" : runnerHost,
                 runnerPort,
@@ -85,8 +88,8 @@ public class PluginRuntimeMetadataStore {
         return mapper.stopStaleRunningRuntimes();
     }
 
-    public int deleteByPluginId(String pluginId) {
-        return mapper.deleteByPluginId(pluginId);
+    public int softDelete(String installationId) {
+        return mapper.softDelete(installationId);
     }
 
     private PluginRuntimeMetadata map(PluginRuntimeRow row) {
@@ -98,6 +101,7 @@ public class PluginRuntimeMetadataStore {
             throw new IllegalArgumentException("Plugin runtime artifact metadata is incomplete");
         }
         return new PluginRuntimeMetadata(
+                row.installationId(),
                 row.pluginId(),
                 row.instanceId(),
                 row.mainClass(),
@@ -114,8 +118,10 @@ public class PluginRuntimeMetadataStore {
     private PluginRuntimeRecord mapRuntime(PluginRuntimeRow row) {
         return new PluginRuntimeRecord(
                 row.id(),
+                row.installationId(),
                 row.pluginId(),
                 row.instanceId(),
+                row.installationName(),
                 row.version(),
                 row.displayName(),
                 row.mainClass(),
@@ -133,14 +139,48 @@ public class PluginRuntimeMetadataStore {
                 row.remoteDebugEnabled(),
                 row.remoteDebugPort(),
                 row.remoteDebugSuspend(),
+                row.ownerUserId(),
+                row.ownerUsername(),
+                row.ownerDepartmentId(),
+                row.ownerDepartmentName(),
                 row.startedAt(),
                 row.createdAt(),
                 row.updatedAt()
         );
     }
 
-    public int updateRemoteDebug(String pluginId, boolean enabled, int port, boolean suspend) {
-        return mapper.updateRemoteDebug(pluginId, enabled, port, suspend);
+    public int updateRemoteDebug(String installationId, boolean enabled, int port, boolean suspend) {
+        return mapper.updateRemoteDebug(installationId, enabled, port, suspend);
+    }
+
+    public PluginRuntimeRecord createInstallation(String pluginId, String installationName, String ownerUserId, Long ownerDepartmentId) {
+        String installationId = java.util.UUID.randomUUID().toString();
+        Map<String, Object> values = new HashMap<>();
+        values.put("installationId", installationId);
+        values.put("pluginId", pluginId);
+        values.put("instanceId", pluginId + "-" + installationId);
+        values.put("installationName", installationName);
+        values.put("ownerUserId", ownerUserId);
+        values.put("ownerDepartmentId", ownerDepartmentId);
+        mapper.insertInstallation(values);
+        return findRuntimeByInstallationId(installationId).orElseThrow(() -> new IllegalStateException("Plugin installation was not saved"));
+    }
+
+    public List<String> notificationChannelIds(String installationId) {
+        return mapper.notificationChannelIds(installationId);
+    }
+
+    public List<String> jobNotificationChannelIds(String installationId) {
+        return mapper.jobNotificationChannelIds(installationId);
+    }
+
+    public void replaceNotificationChannels(String installationId, List<String> channelIds, String actor) {
+        mapper.deleteNotificationChannels(installationId);
+        for (String channelId : channelIds) mapper.insertNotificationChannel(installationId, channelId, actor);
+    }
+
+    public int transferOwnership(String installationId, String ownerUserId, Long ownerDepartmentId) {
+        return mapper.transferOwnership(installationId, ownerUserId, ownerDepartmentId);
     }
 
     public Set<PluginCapability> runtimeCapabilities(String capabilitiesJson) {

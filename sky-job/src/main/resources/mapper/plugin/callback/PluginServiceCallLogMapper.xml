@@ -7,10 +7,17 @@
         <constructor>
             <arg column="id" javaType="_long"/>
             <arg column="job_id" javaType="java.lang.Long"/>
+            <arg column="execution_id" javaType="java.lang.Long"/>
+            <arg column="caller_installation_id" javaType="java.lang.String"/>
             <arg column="caller_plugin_id" javaType="java.lang.String"/>
+            <arg column="caller_owner_user_id" javaType="java.lang.String"/>
+            <arg column="caller_owner_dept_id" javaType="java.lang.Long"/>
             <arg column="caller_instance_id" javaType="java.lang.String"/>
             <arg column="caller_request_id" javaType="java.lang.String"/>
+            <arg column="target_installation_id" javaType="java.lang.String"/>
             <arg column="target_plugin_id" javaType="java.lang.String"/>
+            <arg column="target_owner_user_id" javaType="java.lang.String"/>
+            <arg column="target_owner_dept_id" javaType="java.lang.Long"/>
             <arg column="target_instance_id" javaType="java.lang.String"/>
             <arg column="operation" javaType="java.lang.String"/>
             <arg column="service_request_id" javaType="java.lang.String"/>
@@ -26,37 +33,55 @@
         </constructor>
     </resultMap>
 
+    <sql id="scope">
+        <if test="scope != null and !scope.all">
+            AND <choose>
+                <when test="scope.denied">1 = 0</when>
+                <otherwise>
+                    (
+                        <if test="scope.departmentIds != null and !scope.departmentIds.isEmpty()">
+                            caller_owner_dept_id IN
+                            <foreach collection="scope.departmentIds" item="callerDeptId" open="(" separator="," close=")">#{callerDeptId}</foreach>
+                            OR target_owner_dept_id IN
+                            <foreach collection="scope.departmentIds" item="targetDeptId" open="(" separator="," close=")">#{targetDeptId}</foreach>
+                        </if>
+                        <if test="scope.self">
+                            <if test="scope.departmentIds != null and !scope.departmentIds.isEmpty()"> OR </if>
+                            caller_owner_user_id = #{scope.userId} OR target_owner_user_id = #{scope.userId}
+                        </if>
+                    )
+                </otherwise>
+            </choose>
+        </if>
+    </sql>
+
     <sql id="filters">
-        <where>
-            <if test="jobId != null">
-                job_id = #{jobId}
-            </if>
-            <if test="callerPluginId != null and callerPluginId != ''">
-                AND caller_plugin_id = #{callerPluginId}
-            </if>
-            <if test="targetPluginId != null and targetPluginId != ''">
-                AND target_plugin_id = #{targetPluginId}
-            </if>
-            <if test="operation != null and operation != ''">
-                AND operation = #{operation}
-            </if>
-            <if test="success != null">
-                AND success = #{success}
-            </if>
-        </where>
+        <if test="jobId != null">AND job_id = #{jobId}</if>
+        <if test="callerInstallationId != null and callerInstallationId != ''">AND caller_installation_id = #{callerInstallationId}</if>
+        <if test="callerPluginId != null and callerPluginId != ''">AND caller_plugin_id = #{callerPluginId}</if>
+        <if test="targetInstallationId != null and targetInstallationId != ''">AND target_installation_id = #{targetInstallationId}</if>
+        <if test="targetPluginId != null and targetPluginId != ''">AND target_plugin_id = #{targetPluginId}</if>
+        <if test="operation != null and operation != ''">AND operation = #{operation}</if>
+        <if test="success != null">AND success = #{success}</if>
     </sql>
 
     <insert id="insert" parameterType="com.sky.job.plugin.callback.PluginServiceCallLogCommand">
         INSERT INTO plugin_service_call_log (
-            job_id, caller_plugin_id, caller_instance_id, caller_request_id,
-            target_plugin_id, target_instance_id, operation, service_request_id,
-            target_runner_log_path, timeout_millis, duration_millis, request_bytes,
-            response_bytes, success, error_type, error_message
+            job_id, execution_id,
+            caller_installation_id, caller_plugin_id, caller_owner_user_id, caller_owner_dept_id,
+            caller_instance_id, caller_request_id,
+            target_installation_id, target_plugin_id, target_owner_user_id, target_owner_dept_id,
+            target_instance_id, operation, service_request_id, target_runner_log_path,
+            timeout_millis, duration_millis, request_bytes, response_bytes,
+            success, error_type, error_message
         ) VALUES (
-            #{jobId}, #{callerPluginId}, #{callerInstanceId}, #{callerRequestId},
-            #{targetPluginId}, #{targetInstanceId}, #{operation}, #{serviceRequestId},
-            #{targetRunnerLogPath}, #{timeoutMillis}, #{durationMillis}, #{requestBytes},
-            #{responseBytes}, #{success}, #{errorType}, #{errorMessage}
+            #{jobId}, #{executionId},
+            #{callerInstallationId}, #{callerPluginId}, #{callerOwnerUserId}, #{callerOwnerDepartmentId},
+            #{callerInstanceId}, #{callerRequestId},
+            #{targetInstallationId}, #{targetPluginId}, #{targetOwnerUserId}, #{targetOwnerDepartmentId},
+            #{targetInstanceId}, #{operation}, #{serviceRequestId}, #{targetRunnerLogPath},
+            #{timeoutMillis}, #{durationMillis}, #{requestBytes}, #{responseBytes},
+            #{success}, #{errorType}, #{errorMessage}
         )
     </insert>
 
@@ -64,12 +89,16 @@
         SELECT *
         FROM plugin_service_call_log
         WHERE id = #{id}
+        <include refid="scope"/>
     </select>
 
     <select id="list" resultMap="PluginServiceCallLogResultMap">
         SELECT *
         FROM plugin_service_call_log
-        <include refid="filters"/>
+        <where>
+            <include refid="filters"/>
+            <include refid="scope"/>
+        </where>
         ORDER BY id DESC
         LIMIT #{limit} OFFSET #{offset}
     </select>
@@ -77,6 +106,9 @@
     <select id="count" resultType="long">
         SELECT COUNT(*)
         FROM plugin_service_call_log
-        <include refid="filters"/>
+        <where>
+            <include refid="filters"/>
+            <include refid="scope"/>
+        </where>
     </select>
 </mapper>

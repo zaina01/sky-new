@@ -7,7 +7,7 @@ import jakarta.validation.constraints.NotNull;
 
 public record UpdateJobRequest(
         @NotBlank String jobName,
-        @NotBlank String pluginId,
+        @NotBlank String pluginInstallationId,
         @NotBlank String cronExpression,
         @NotNull MisfirePolicy misfirePolicy,
         boolean concurrent,

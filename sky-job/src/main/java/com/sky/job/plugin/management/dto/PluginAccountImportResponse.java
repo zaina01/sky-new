@@ -3,7 +3,7 @@ package com.sky.job.plugin.management.dto;
 import java.util.List;
 
 public record PluginAccountImportResponse(
-        String pluginId,
+        String installationId,
         boolean dryRun,
         int totalRows,
         int successRows,

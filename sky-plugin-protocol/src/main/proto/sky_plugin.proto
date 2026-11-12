@@ -128,6 +128,9 @@ message PluginServiceCallRequest {
   string job_id = 5;
   string request_id = 6;
   int64 timeout_millis = 7;
+  // Preferred target identity. target_plugin_id is retained only for legacy
+  // callers and is accepted when exactly one authorized installation matches.
+  string target_installation_id = 8;
 }
 
 message PluginServiceCallResponse {
@@ -145,6 +148,8 @@ message PluginServiceRunRequest {
   string operation = 4;
   string request_json = 5;
   int64 timeout_millis = 6;
+  string caller_installation_id = 7;
+  string target_installation_id = 8;
 }
 
 message PluginServiceRunResponse {

@@ -4,36 +4,36 @@ import org.apache.ibatis.annotations.Param;
 
 public interface PluginDataMapper {
     int countByKey(
-            @Param("pluginId") String pluginId,
+            @Param("installationId") String installationId,
             @Param("collection") String collection,
             @Param("dataKey") String dataKey
     );
 
-    int countRows(@Param("pluginId") String pluginId);
+    int countRows(@Param("installationId") String installationId);
 
     int upsert(
-            @Param("pluginId") String pluginId,
+            @Param("installationId") String installationId,
             @Param("collection") String collection,
             @Param("dataKey") String dataKey,
             @Param("dataJson") String dataJson
     );
 
     int delete(
-            @Param("pluginId") String pluginId,
+            @Param("installationId") String installationId,
             @Param("collection") String collection,
             @Param("dataKey") String dataKey
     );
 
-    int deleteByPluginId(@Param("pluginId") String pluginId);
+    int deleteByInstallationId(@Param("installationId") String installationId);
 
     String select(
-            @Param("pluginId") String pluginId,
+            @Param("installationId") String installationId,
             @Param("collection") String collection,
             @Param("dataKey") String dataKey
     );
 
     String selectAll(
-            @Param("pluginId") String pluginId,
+            @Param("installationId") String installationId,
             @Param("collection") String collection,
             @Param("limit") int limit
     );

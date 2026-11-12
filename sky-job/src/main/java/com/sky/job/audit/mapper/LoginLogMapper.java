@@ -1,6 +1,7 @@
 package com.sky.job.audit.mapper;
 
 import com.sky.job.audit.LoginLog;
+import com.sky.job.security.EffectiveDataScope;
 import org.apache.ibatis.annotations.Param;
 
 import java.time.LocalDateTime;
@@ -9,6 +10,7 @@ import java.util.List;
 public interface LoginLogMapper {
     int insert(
             @Param("userId") String userId,
+            @Param("ownerDepartmentId") Long ownerDepartmentId,
             @Param("username") String username,
             @Param("status") String status,
             @Param("deviceType") String deviceType,
@@ -29,6 +31,7 @@ public interface LoginLogMapper {
             @Param("deviceType") String deviceType,
             @Param("startTime") LocalDateTime startTime,
             @Param("endTime") LocalDateTime endTime,
+            @Param("scope") EffectiveDataScope scope,
             @Param("limit") int limit,
             @Param("offset") int offset
     );
@@ -41,7 +44,8 @@ public interface LoginLogMapper {
             @Param("loginIp") String loginIp,
             @Param("deviceType") String deviceType,
             @Param("startTime") LocalDateTime startTime,
-            @Param("endTime") LocalDateTime endTime
+            @Param("endTime") LocalDateTime endTime,
+            @Param("scope") EffectiveDataScope scope
     );
 
     long countOlderThan(@Param("cutoff") LocalDateTime cutoff);

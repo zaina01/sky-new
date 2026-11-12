@@ -9,6 +9,7 @@ public record SystemLog(
         String level,
         String status,
         String operatorUserId,
+        Long ownerDepartmentId,
         String operatorName,
         String sourceType,
         String requestUri,

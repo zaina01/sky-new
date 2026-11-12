@@ -6,7 +6,9 @@
     <resultMap id="PluginServicePermissionResultMap" type="com.sky.job.plugin.callback.PluginServicePermission">
         <constructor>
             <arg column="id" javaType="_long"/>
+            <arg column="caller_installation_id" javaType="java.lang.String"/>
             <arg column="caller_plugin_id" javaType="java.lang.String"/>
+            <arg column="target_installation_id" javaType="java.lang.String"/>
             <arg column="target_plugin_id" javaType="java.lang.String"/>
             <arg column="operation" javaType="java.lang.String"/>
             <arg column="enabled" javaType="_boolean"/>
@@ -15,55 +17,122 @@
         </constructor>
     </resultMap>
 
+    <sql id="columns">
+        p.id, p.caller_installation_id, caller.plugin_id AS caller_plugin_id,
+        p.target_installation_id, target.plugin_id AS target_plugin_id,
+        p.operation, p.enabled, p.created_at, p.updated_at
+    </sql>
+
+    <sql id="joins">
+        FROM plugin_service_permission p
+        JOIN plugin_installation caller ON caller.installation_id = p.caller_installation_id AND caller.deleted = FALSE
+        JOIN plugin_installation target ON target.installation_id = p.target_installation_id AND target.deleted = FALSE
+    </sql>
+
+    <!-- A permission edge is visible only when both endpoints are in scope. -->
+    <sql id="scope">
+        <if test="scope != null and !scope.all">
+            AND <choose>
+                <when test="scope.denied">1 = 0</when>
+                <otherwise>
+                    (
+                        (
+                            <if test="scope.departmentIds != null and !scope.departmentIds.isEmpty()">
+                                caller.owner_dept_id IN
+                                <foreach collection="scope.departmentIds" item="deptId" open="(" separator="," close=")">#{deptId}</foreach>
+                            </if>
+                            <if test="scope.self">
+                                <if test="scope.departmentIds != null and !scope.departmentIds.isEmpty()"> OR </if>
+                                caller.owner_user_id = #{scope.userId}
+                            </if>
+                        )
+                        AND
+                        (
+                            <if test="scope.departmentIds != null and !scope.departmentIds.isEmpty()">
+                                target.owner_dept_id IN
+                                <foreach collection="scope.departmentIds" item="deptId" open="(" separator="," close=")">#{deptId}</foreach>
+                            </if>
+                            <if test="scope.self">
+                                <if test="scope.departmentIds != null and !scope.departmentIds.isEmpty()"> OR </if>
+                                target.owner_user_id = #{scope.userId}
+                            </if>
+                        )
+                    )
+                </otherwise>
+            </choose>
+        </if>
+    </sql>
+
     <sql id="filters">
-        <where>
-            <if test="callerPluginId != null and callerPluginId != ''">
-                caller_plugin_id = #{callerPluginId}
-            </if>
-            <if test="targetPluginId != null and targetPluginId != ''">
-                AND target_plugin_id = #{targetPluginId}
-            </if>
-            <if test="operation != null and operation != ''">
-                AND operation = #{operation}
-            </if>
-            <if test="enabled != null">
-                AND enabled = #{enabled}
-            </if>
-        </where>
+        <if test="callerInstallationId != null and callerInstallationId != ''">
+            AND p.caller_installation_id = #{callerInstallationId}
+        </if>
+        <if test="callerPluginId != null and callerPluginId != ''">
+            AND caller.plugin_id = #{callerPluginId}
+        </if>
+        <if test="targetInstallationId != null and targetInstallationId != ''">
+            AND p.target_installation_id = #{targetInstallationId}
+        </if>
+        <if test="targetPluginId != null and targetPluginId != ''">
+            AND target.plugin_id = #{targetPluginId}
+        </if>
+        <if test="operation != null and operation != ''">
+            AND p.operation = #{operation}
+        </if>
+        <if test="enabled != null">
+            AND p.enabled = #{enabled}
+        </if>
     </sql>
 
     <select id="countEnabled" resultType="int">
         SELECT COUNT(*)
-        FROM plugin_service_permission
-        WHERE caller_plugin_id = #{callerPluginId}
-          AND target_plugin_id = #{targetPluginId}
-          AND operation = #{operation}
-          AND enabled = TRUE
+        <include refid="joins"/>
+        WHERE p.caller_installation_id = #{callerInstallationId}
+          AND p.target_installation_id = #{targetInstallationId}
+          AND p.operation = #{operation}
+          AND p.enabled = TRUE
+    </select>
+
+    <select id="authorizedTargetInstallationIds" resultType="java.lang.String">
+        SELECT p.target_installation_id
+        <include refid="joins"/>
+        WHERE p.caller_installation_id = #{callerInstallationId}
+          AND target.plugin_id = #{targetPluginId}
+          AND p.operation = #{operation}
+          AND p.enabled = TRUE
+        ORDER BY p.target_installation_id
     </select>
 
     <select id="list" resultMap="PluginServicePermissionResultMap">
-        SELECT *
-        FROM plugin_service_permission
-        <include refid="filters"/>
-        ORDER BY id DESC
+        SELECT <include refid="columns"/>
+        <include refid="joins"/>
+        <where>
+            <include refid="filters"/>
+            <include refid="scope"/>
+        </where>
+        ORDER BY p.id DESC
         LIMIT #{limit} OFFSET #{offset}
     </select>
 
     <select id="count" resultType="long">
         SELECT COUNT(*)
-        FROM plugin_service_permission
-        <include refid="filters"/>
+        <include refid="joins"/>
+        <where>
+            <include refid="filters"/>
+            <include refid="scope"/>
+        </where>
     </select>
 
     <select id="findById" resultMap="PluginServicePermissionResultMap">
-        SELECT *
-        FROM plugin_service_permission
-        WHERE id = #{id}
+        SELECT <include refid="columns"/>
+        <include refid="joins"/>
+        WHERE p.id = #{id}
+        <include refid="scope"/>
     </select>
 
     <insert id="upsert">
-        INSERT INTO plugin_service_permission (caller_plugin_id, target_plugin_id, operation, enabled)
-        VALUES (#{callerPluginId}, #{targetPluginId}, #{operation}, #{enabled})
+        INSERT INTO plugin_service_permission (caller_installation_id, target_installation_id, operation, enabled)
+        VALUES (#{callerInstallationId}, #{targetInstallationId}, #{operation}, #{enabled})
         ON DUPLICATE KEY UPDATE enabled = VALUES(enabled), updated_at = CURRENT_TIMESTAMP
     </insert>
 

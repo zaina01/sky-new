@@ -7,6 +7,7 @@ import org.apache.ibatis.annotations.Param;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
+import com.sky.job.security.EffectiveDataScope;
 
 public interface JobExecutionMapper {
     int insertRunning(Map<String, Object> values);
@@ -56,21 +57,25 @@ public interface JobExecutionMapper {
 
     int deleteByJobId(@Param("jobId") long jobId);
 
-    JobExecutionRow findById(@Param("id") long id);
+    JobExecutionRow findById(@Param("id") long id, @Param("scope") EffectiveDataScope scope);
+
+    JobExecutionRow findByIdUnscoped(@Param("id") long id);
 
     List<JobExecutionRow> list(
             @Param("jobId") Long jobId,
+            @Param("pluginInstallationId") String pluginInstallationId,
             @Param("pluginId") String pluginId,
             @Param("status") String status,
+            @Param("scope") EffectiveDataScope scope,
             @Param("limit") int limit,
             @Param("offset") int offset
     );
 
-    long count(@Param("jobId") Long jobId, @Param("pluginId") String pluginId, @Param("status") String status);
+    long count(@Param("jobId") Long jobId, @Param("pluginInstallationId") String pluginInstallationId, @Param("pluginId") String pluginId, @Param("status") String status, @Param("scope") EffectiveDataScope scope);
 
-    List<StatusCountRow> countByStatusBetween(@Param("startTime") LocalDateTime startTime, @Param("endTime") LocalDateTime endTime);
+    List<StatusCountRow> countByStatusBetween(@Param("startTime") LocalDateTime startTime, @Param("endTime") LocalDateTime endTime, @Param("scope") EffectiveDataScope scope);
 
-    List<DailyStatusCountRow> countDailyByStatus(@Param("startTime") LocalDateTime startTime, @Param("endTime") LocalDateTime endTime);
+    List<DailyStatusCountRow> countDailyByStatus(@Param("startTime") LocalDateTime startTime, @Param("endTime") LocalDateTime endTime, @Param("scope") EffectiveDataScope scope);
 
-    List<JobExecutionRow> listRecentFailures(@Param("statuses") List<String> statuses, @Param("limit") int limit);
+    List<JobExecutionRow> listRecentFailures(@Param("statuses") List<String> statuses, @Param("scope") EffectiveDataScope scope, @Param("limit") int limit);
 }

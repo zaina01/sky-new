@@ -4,6 +4,7 @@ import java.time.LocalDateTime;
 
 public record PluginTaskLog(
         long id,
+        String installationId,
         String pluginId,
         String instanceId,
         String jobId,

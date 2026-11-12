@@ -63,7 +63,7 @@ public class NotificationDeliveryService {
             historyStore.markSendingFinalFailed(history.id(), NotificationSendResult.failed("PAYLOAD_UNAVAILABLE", "Notification payload is not retryable", "", ""));
             return;
         }
-        NotificationChannel channel = channelStore.findByChannelId(history.channelId()).orElse(null);
+        NotificationChannel channel = channelStore.findByChannelIdUnscoped(history.channelId()).orElse(null);
         if (channel == null || !channel.enabled()) {
             historyStore.markSendingFinalFailed(history.id(), NotificationSendResult.failed("CHANNEL_UNAVAILABLE", "Notification channel not found or disabled", "", ""));
             return;
@@ -71,10 +71,13 @@ public class NotificationDeliveryService {
         NotificationSendCommand command = new NotificationSendCommand(
                 history.sourceType(),
                 history.requestId(),
+                history.installationId(),
                 history.pluginId(),
                 history.instanceId(),
                 history.jobId(),
                 history.executionId(),
+                history.sourceOwnerUserId(),
+                history.sourceOwnerDepartmentId(),
                 List.of(history.channelId()),
                 history.title(),
                 history.contentPayload(),

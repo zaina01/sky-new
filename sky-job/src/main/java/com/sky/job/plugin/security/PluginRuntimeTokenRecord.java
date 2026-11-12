@@ -4,8 +4,11 @@ import java.time.Instant;
 import java.util.Set;
 
 record PluginRuntimeTokenRecord(
+        String installationId,
         String pluginId,
         String instanceId,
+        Long jobId,
+        Long executionId,
         byte[] tokenDigest,
         Set<PluginCapability> capabilities,
         Instant issuedAt,
@@ -13,10 +16,10 @@ record PluginRuntimeTokenRecord(
         java.time.Duration ttl
 ) {
     PluginRuntimeTokenRecord renew(Instant now) {
-        return new PluginRuntimeTokenRecord(pluginId, instanceId, tokenDigest, capabilities, issuedAt, now.plus(ttl), ttl);
+        return new PluginRuntimeTokenRecord(installationId, pluginId, instanceId, jobId, executionId, tokenDigest, capabilities, issuedAt, now.plus(ttl), ttl);
     }
 
     PluginRuntimePrincipal principal() {
-        return new PluginRuntimePrincipal(pluginId, instanceId, capabilities, issuedAt, expiresAt);
+        return new PluginRuntimePrincipal(installationId, pluginId, instanceId, jobId, executionId, capabilities, issuedAt, expiresAt);
     }
 }

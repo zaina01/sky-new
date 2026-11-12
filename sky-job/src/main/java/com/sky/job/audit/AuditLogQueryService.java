@@ -3,6 +3,10 @@ package com.sky.job.audit;
 import com.sky.job.audit.dto.LoginLogResponse;
 import com.sky.job.audit.dto.SystemLogResponse;
 import com.sky.job.scheduler.dto.PageResponse;
+import com.sky.job.security.AuthenticatedUser;
+import com.sky.job.security.DataScopeService;
+import com.sky.job.security.EffectiveDataScope;
+import com.sky.job.security.PermissionNames;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
@@ -11,10 +15,12 @@ import java.time.LocalDateTime;
 public class AuditLogQueryService {
     private final LoginLogStore loginLogStore;
     private final SystemLogStore systemLogStore;
+    private final DataScopeService dataScopeService;
 
-    public AuditLogQueryService(LoginLogStore loginLogStore, SystemLogStore systemLogStore) {
+    public AuditLogQueryService(LoginLogStore loginLogStore, SystemLogStore systemLogStore, DataScopeService dataScopeService) {
         this.loginLogStore = loginLogStore;
         this.systemLogStore = systemLogStore;
+        this.dataScopeService = dataScopeService;
     }
 
     public PageResponse<LoginLogResponse> listLoginLogs(
@@ -26,14 +32,16 @@ public class AuditLogQueryService {
             LocalDateTime startTime,
             LocalDateTime endTime,
             Integer page,
-            Integer size
+            Integer size,
+            AuthenticatedUser user
     ) {
         validateTimeRange(startTime, endTime);
+        EffectiveDataScope scope = dataScopeService.resolve(user, PermissionNames.SYSTEM_LOGIN_LOG_READ);
         return new PageResponse<>(
-                loginLogStore.list(username, userId, status, loginIp, deviceType, startTime, endTime, page, size).stream().map(LoginLogResponse::from).toList(),
+                loginLogStore.list(username, userId, status, loginIp, deviceType, startTime, endTime, scope, page, size).stream().map(LoginLogResponse::from).toList(),
                 normalizedPage(page),
                 normalizedSize(size),
-                loginLogStore.count(username, userId, status, loginIp, deviceType, startTime, endTime)
+                loginLogStore.count(username, userId, status, loginIp, deviceType, startTime, endTime, scope)
         );
     }
 
@@ -50,14 +58,16 @@ public class AuditLogQueryService {
             LocalDateTime startTime,
             LocalDateTime endTime,
             Integer page,
-            Integer size
+            Integer size,
+            AuthenticatedUser user
     ) {
         validateTimeRange(startTime, endTime);
+        EffectiveDataScope scope = dataScopeService.resolve(user, PermissionNames.SYSTEM_LOG_READ);
         return new PageResponse<>(
-                systemLogStore.list(module, action, level, status, operatorUserId, operatorName, sourceType, targetType, targetId, startTime, endTime, page, size).stream().map(SystemLogResponse::from).toList(),
+                systemLogStore.list(module, action, level, status, operatorUserId, operatorName, sourceType, targetType, targetId, startTime, endTime, scope, page, size).stream().map(SystemLogResponse::from).toList(),
                 normalizedPage(page),
                 normalizedSize(size),
-                systemLogStore.count(module, action, level, status, operatorUserId, operatorName, sourceType, targetType, targetId, startTime, endTime)
+                systemLogStore.count(module, action, level, status, operatorUserId, operatorName, sourceType, targetType, targetId, startTime, endTime, scope)
         );
     }
 

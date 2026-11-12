@@ -2,6 +2,7 @@ package com.sky.job.audit;
 
 import com.sky.job.audit.mapper.SystemLogMapper;
 import com.sky.job.security.AuthenticatedUser;
+import com.sky.job.security.EffectiveDataScope;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -21,12 +22,14 @@ public class SystemLogStore {
     public void record(String module, String action, String level, String status, String targetType, String targetId, String message, HttpServletRequest request) {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         String userId = null;
+        Long ownerDepartmentId = null;
         String username = null;
         if (authentication != null && authentication.getPrincipal() instanceof AuthenticatedUser user) {
             userId = user.userId();
+            ownerDepartmentId = user.departmentId();
             username = user.username();
         }
-        mapper.insert(module, action, level, status, userId, username, username == null ? "SYSTEM" : "USER", request.getRequestURI(), request.getMethod(), clientIp(request), userAgent(request), targetType, targetId, message);
+        mapper.insert(module, action, level, status, userId, ownerDepartmentId, username, username == null ? "SYSTEM" : "USER", request.getRequestURI(), request.getMethod(), clientIp(request), userAgent(request), targetType, targetId, message);
     }
 
     public void recordSystem(String module, String action, String level, String status, String targetType, String targetId, String message) {
@@ -45,10 +48,11 @@ public class SystemLogStore {
             String targetId,
             LocalDateTime startTime,
             LocalDateTime endTime,
+            EffectiveDataScope scope,
             Integer page,
             Integer size
     ) {
-        return mapper.list(trim(module), trim(action), trim(level), trim(status), trim(operatorUserId), trim(operatorName), like(operatorName), trim(sourceType), trim(targetType), trim(targetId), startTime, endTime, normalizedSize(size), (normalizedPage(page) - 1) * normalizedSize(size));
+        return mapper.list(trim(module), trim(action), trim(level), trim(status), trim(operatorUserId), trim(operatorName), like(operatorName), trim(sourceType), trim(targetType), trim(targetId), startTime, endTime, scope, normalizedSize(size), (normalizedPage(page) - 1) * normalizedSize(size));
     }
 
     public long count(
@@ -62,9 +66,10 @@ public class SystemLogStore {
             String targetType,
             String targetId,
             LocalDateTime startTime,
-            LocalDateTime endTime
+            LocalDateTime endTime,
+            EffectiveDataScope scope
     ) {
-        return mapper.count(trim(module), trim(action), trim(level), trim(status), trim(operatorUserId), trim(operatorName), like(operatorName), trim(sourceType), trim(targetType), trim(targetId), startTime, endTime);
+        return mapper.count(trim(module), trim(action), trim(level), trim(status), trim(operatorUserId), trim(operatorName), like(operatorName), trim(sourceType), trim(targetType), trim(targetId), startTime, endTime, scope);
     }
 
     public long countOlderThan(LocalDateTime cutoff) {

@@ -9,7 +9,7 @@ public record CreateNotificationRuleRequest(
         String displayName,
         Boolean enabled,
         NotificationEventType eventType,
-        String pluginId,
+        String pluginInstallationId,
         String jobId,
         String severity,
         List<String> channelIds,

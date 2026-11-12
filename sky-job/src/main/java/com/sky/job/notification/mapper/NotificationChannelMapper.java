@@ -3,6 +3,7 @@ package com.sky.job.notification.mapper;
 import org.apache.ibatis.annotations.Param;
 
 import java.util.List;
+import com.sky.job.security.EffectiveDataScope;
 
 public interface NotificationChannelMapper {
     List<NotificationChannelRow> list(
@@ -11,6 +12,7 @@ public interface NotificationChannelMapper {
             @Param("channelId") String channelId,
             @Param("displayName") String displayName,
             @Param("displayNameLike") String displayNameLike,
+            @Param("scope") EffectiveDataScope scope,
             @Param("limit") int limit,
             @Param("offset") int offset
     );
@@ -20,10 +22,13 @@ public interface NotificationChannelMapper {
             @Param("enabled") Boolean enabled,
             @Param("channelId") String channelId,
             @Param("displayName") String displayName,
-            @Param("displayNameLike") String displayNameLike
+            @Param("displayNameLike") String displayNameLike,
+            @Param("scope") EffectiveDataScope scope
     );
 
-    NotificationChannelRow findByChannelId(@Param("channelId") String channelId);
+    NotificationChannelRow findByChannelId(@Param("channelId") String channelId, @Param("scope") EffectiveDataScope scope);
+
+    NotificationChannelRow findByChannelIdUnscoped(@Param("channelId") String channelId);
 
     int insert(
             @Param("channelId") String channelId,
@@ -32,6 +37,8 @@ public interface NotificationChannelMapper {
             @Param("enabled") boolean enabled,
             @Param("configJson") String configJson,
             @Param("remark") String remark,
+            @Param("ownerUserId") String ownerUserId,
+            @Param("ownerDepartmentId") Long ownerDepartmentId,
             @Param("createdBy") String createdBy
     );
 
@@ -49,7 +56,11 @@ public interface NotificationChannelMapper {
 
     int delete(@Param("channelId") String channelId);
 
-    List<NotificationChannelRow> listEnabled();
+    List<NotificationChannelRow> listEnabledUnscoped();
 
-    List<NotificationChannelRow> listEnabledByIds(@Param("channelIds") List<String> channelIds);
+    List<NotificationChannelRow> listByIdsUnscoped(@Param("channelIds") List<String> channelIds);
+
+    int countBindings(@Param("channelId") String channelId);
+
+    int transferOwnership(@Param("channelId") String channelId, @Param("ownerUserId") String ownerUserId, @Param("ownerDepartmentId") Long ownerDepartmentId, @Param("updatedBy") String updatedBy);
 }

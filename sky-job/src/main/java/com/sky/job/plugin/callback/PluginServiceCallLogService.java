@@ -4,6 +4,11 @@ import com.sky.job.plugin.callback.dto.PluginServiceCallLogResponse;
 import com.sky.job.plugin.callback.dto.PluginServiceCallRunnerLogResponse;
 import com.sky.job.plugin.runtime.process.ProcessPluginRuntimeProperties;
 import com.sky.job.scheduler.dto.PageResponse;
+import com.sky.job.security.AuthenticatedUser;
+import com.sky.job.security.DataScopeService;
+import com.sky.job.security.EffectiveDataScope;
+import com.sky.job.security.PermissionNames;
+import com.sky.job.web.ResourceNotFoundException;
 import org.springframework.stereotype.Service;
 
 import java.io.IOException;
@@ -19,31 +24,34 @@ public class PluginServiceCallLogService {
 
     private final PluginServiceCallLogStore store;
     private final ProcessPluginRuntimeProperties runtimeProperties;
+    private final DataScopeService dataScopeService;
 
-    public PluginServiceCallLogService(PluginServiceCallLogStore store, ProcessPluginRuntimeProperties runtimeProperties) {
+    public PluginServiceCallLogService(PluginServiceCallLogStore store, ProcessPluginRuntimeProperties runtimeProperties, DataScopeService dataScopeService) {
         this.store = store;
         this.runtimeProperties = runtimeProperties;
+        this.dataScopeService = dataScopeService;
     }
 
-    public PageResponse<PluginServiceCallLogResponse> list(Long jobId, String callerPluginId, String targetPluginId, String operation, Boolean success, Integer page, Integer size) {
+    public PageResponse<PluginServiceCallLogResponse> list(Long jobId, String callerInstallationId, String callerPluginId, String targetInstallationId, String targetPluginId, String operation, Boolean success, Integer page, Integer size, AuthenticatedUser user) {
+        EffectiveDataScope scope = dataScopeService.resolve(user, PermissionNames.PLUGIN_AUDIT_READ);
         return new PageResponse<>(
-                store.list(jobId, callerPluginId, targetPluginId, operation, success, page, size).stream().map(PluginServiceCallLogResponse::from).toList(),
+                store.list(jobId, callerInstallationId, callerPluginId, targetInstallationId, targetPluginId, operation, success, scope, page, size).stream().map(PluginServiceCallLogResponse::from).toList(),
                 normalizedPage(page),
                 normalizedSize(size),
-                store.count(jobId, callerPluginId, targetPluginId, operation, success)
+                store.count(jobId, callerInstallationId, callerPluginId, targetInstallationId, targetPluginId, operation, success, scope)
         );
     }
 
-    public PluginServiceCallLogResponse get(long id) {
-        return PluginServiceCallLogResponse.from(log(id));
+    public PluginServiceCallLogResponse get(long id, AuthenticatedUser user) {
+        return PluginServiceCallLogResponse.from(log(id, user));
     }
 
-    public PluginServiceCallRunnerLogResponse runnerLog(long id, Long offset, Integer limitBytes, Integer tailBytes) {
-        PluginServiceCallLog log = log(id);
+    public PluginServiceCallRunnerLogResponse runnerLog(long id, Long offset, Integer limitBytes, Integer tailBytes, AuthenticatedUser user) {
+        PluginServiceCallLog log = log(id, user);
         int limit = normalizedLimitBytes(limitBytes, tailBytes);
         Path logPath = runnerLogPath(log.targetRunnerLogPath());
         if (!Files.isRegularFile(logPath)) {
-            return new PluginServiceCallRunnerLogResponse(log.id(), log.targetPluginId(), log.targetInstanceId(), logPath.toString(), false, "", 0, 0, limit, 0, true, false);
+            return new PluginServiceCallRunnerLogResponse(log.id(), log.targetInstallationId(), log.targetPluginId(), log.targetInstanceId(), logPath.toString(), false, "", 0, 0, limit, 0, true, false);
         }
         try {
             long sizeBytes = Files.size(logPath);
@@ -57,14 +65,15 @@ public class PluginServiceCallLogService {
             long nextOffset = start + bytesToRead;
             boolean eof = nextOffset >= sizeBytes;
             boolean truncated = offset == null && tailBytes != null && start > 0;
-            return new PluginServiceCallRunnerLogResponse(log.id(), log.targetPluginId(), log.targetInstanceId(), logPath.toString(), true, new String(bytes, StandardCharsets.UTF_8), start, nextOffset, limit, sizeBytes, eof, truncated);
+            return new PluginServiceCallRunnerLogResponse(log.id(), log.targetInstallationId(), log.targetPluginId(), log.targetInstanceId(), logPath.toString(), true, new String(bytes, StandardCharsets.UTF_8), start, nextOffset, limit, sizeBytes, eof, truncated);
         } catch (IOException exception) {
             throw new IllegalStateException("Failed to read plugin service runner log", exception);
         }
     }
 
-    private PluginServiceCallLog log(long id) {
-        return store.findById(id).orElseThrow(() -> new IllegalArgumentException("Plugin service call log not found"));
+    private PluginServiceCallLog log(long id, AuthenticatedUser user) {
+        EffectiveDataScope scope = dataScopeService.resolve(user, PermissionNames.PLUGIN_AUDIT_READ);
+        return store.findById(id, scope).orElseThrow(() -> new ResourceNotFoundException("Plugin service call log not found"));
     }
 
     private Path runnerLogPath(String value) {

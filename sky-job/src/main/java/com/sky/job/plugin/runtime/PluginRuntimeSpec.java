@@ -7,6 +7,7 @@ import java.util.List;
 import java.util.Set;
 
 public record PluginRuntimeSpec(
+        String installationId,
         String pluginId,
         String instanceId,
         String mainClass,
@@ -19,7 +20,9 @@ public record PluginRuntimeSpec(
         boolean remoteDebugEnabled,
         int remoteDebugPort,
         boolean remoteDebugSuspend,
-        String runId
+        String runId,
+        Long jobId,
+        Long executionId
 ) {
     public PluginRuntimeSpec {
         if (remoteDebugPort <= 0) remoteDebugPort = 5005;

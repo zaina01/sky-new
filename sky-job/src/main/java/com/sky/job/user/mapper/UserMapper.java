@@ -26,11 +26,13 @@ public interface UserMapper {
             @Param("username") String username,
             @Param("usernameLike") String usernameLike,
             @Param("enabled") Boolean enabled,
+            @Param("departmentFilterIds") List<Long> departmentFilterIds,
+            @Param("scope") com.sky.job.security.EffectiveDataScope scope,
             @Param("limit") int limit,
             @Param("offset") int offset
     );
 
-    long count(@Param("username") String username, @Param("usernameLike") String usernameLike, @Param("enabled") Boolean enabled);
+    long count(@Param("username") String username, @Param("usernameLike") String usernameLike, @Param("enabled") Boolean enabled, @Param("departmentFilterIds") List<Long> departmentFilterIds, @Param("scope") com.sky.job.security.EffectiveDataScope scope);
 
     int insert(User user);
 
@@ -41,6 +43,7 @@ public interface UserMapper {
             @Param("email") String email,
             @Param("phone") String phone,
             @Param("avatar") String avatar,
+            @Param("departmentId") Long departmentId,
             @Param("enabled") boolean enabled
     );
 
@@ -59,4 +62,6 @@ public interface UserMapper {
     List<String> roles(@Param("userId") String userId);
 
     List<String> permissions(@Param("userId") String userId);
+
+    int countOwnedResources(@Param("userId") String userId);
 }

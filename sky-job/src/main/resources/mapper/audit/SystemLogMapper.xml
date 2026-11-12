@@ -11,6 +11,7 @@
             <arg column="level" javaType="java.lang.String"/>
             <arg column="status" javaType="java.lang.String"/>
             <arg column="operator_user_id" javaType="java.lang.String"/>
+            <arg column="owner_dept_id" javaType="java.lang.Long"/>
             <arg column="operator_name" javaType="java.lang.String"/>
             <arg column="source_type" javaType="java.lang.String"/>
             <arg column="request_uri" javaType="java.lang.String"/>
@@ -27,8 +28,8 @@
     </resultMap>
 
     <insert id="insert">
-        INSERT INTO system_log (module, action, level, status, operator_user_id, operator_name, source_type, request_uri, request_method, ip, user_agent, target_type, target_id, message)
-        VALUES (#{module}, #{action}, #{level}, #{status}, #{operatorUserId}, #{operatorName}, #{sourceType}, #{requestUri}, #{requestMethod}, #{ip}, #{userAgent}, #{targetType}, #{targetId}, #{message})
+        INSERT INTO system_log (module, action, level, status, operator_user_id, owner_dept_id, operator_name, source_type, request_uri, request_method, ip, user_agent, target_type, target_id, message)
+        VALUES (#{module}, #{action}, #{level}, #{status}, #{operatorUserId}, #{ownerDepartmentId}, #{operatorName}, #{sourceType}, #{requestUri}, #{requestMethod}, #{ip}, #{userAgent}, #{targetType}, #{targetId}, #{message})
     </insert>
 
     <insert id="insertSystem">
@@ -70,6 +71,20 @@
             </if>
             <if test="endTime != null">
                 AND create_time &lt;= #{endTime}
+            </if>
+            <if test="scope != null and !scope.all">
+                AND <choose>
+                    <when test="scope.denied">1 = 0</when>
+                    <otherwise>(
+                        <if test="scope.departmentIds != null and !scope.departmentIds.isEmpty()">
+                            owner_dept_id IN <foreach collection="scope.departmentIds" item="deptId" open="(" separator="," close=")">#{deptId}</foreach>
+                        </if>
+                        <if test="scope.self">
+                            <if test="scope.departmentIds != null and !scope.departmentIds.isEmpty()"> OR </if>
+                            operator_user_id = #{scope.userId}
+                        </if>
+                    )</otherwise>
+                </choose>
             </if>
         </where>
     </sql>

@@ -1,6 +1,7 @@
 package com.sky.job.system.mapper;
 
 import com.sky.job.system.Role;
+import com.sky.job.security.RoleDataScopeGrant;
 import org.apache.ibatis.annotations.Param;
 
 import java.util.List;
@@ -36,4 +37,16 @@ public interface RoleMapper {
     int assignPermission(@Param("roleId") Long roleId, @Param("permissionName") String permissionName);
 
     int countAssigned(@Param("roleId") Long roleId);
+
+    int updateDataScope(@Param("roleId") Long roleId, @Param("dataScope") String dataScope);
+
+    int deleteRoleDepartments(@Param("roleId") Long roleId);
+
+    int assignDepartment(@Param("roleId") Long roleId, @Param("departmentId") Long departmentId);
+
+    List<Long> departmentIds(@Param("roleId") Long roleId);
+
+    List<RoleDataScopeGrant> dataScopeGrants(@Param("userId") String userId, @Param("permissionName") String permissionName);
+
+    List<Long> customDepartmentIds(@Param("userId") String userId, @Param("permissionName") String permissionName);
 }

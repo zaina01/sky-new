@@ -1,20 +1,16 @@
 <?xml version="1.0" encoding="UTF-8" ?>
-<!DOCTYPE mapper
-        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
-        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="com.sky.job.scheduler.mapper.PluginRuntimeMetadataMapper">
     <resultMap id="StatusCountRowResultMap" type="com.sky.job.common.mapper.StatusCountRow">
-        <constructor>
-            <arg column="status" javaType="java.lang.String"/>
-            <arg column="total" javaType="_long"/>
-        </constructor>
+        <constructor><arg column="status" javaType="java.lang.String"/><arg column="total" javaType="_long"/></constructor>
     </resultMap>
-
     <resultMap id="PluginRuntimeRowResultMap" type="com.sky.job.scheduler.mapper.PluginRuntimeRow">
         <constructor>
             <arg column="id" javaType="_long"/>
+            <arg column="installation_id" javaType="java.lang.String"/>
             <arg column="plugin_id" javaType="java.lang.String"/>
             <arg column="instance_id" javaType="java.lang.String"/>
+            <arg column="installation_name" javaType="java.lang.String"/>
             <arg column="version" javaType="java.lang.String"/>
             <arg column="display_name" javaType="java.lang.String"/>
             <arg column="main_class" javaType="java.lang.String"/>
@@ -32,112 +28,132 @@
             <arg column="remote_debug_enabled" javaType="_boolean"/>
             <arg column="remote_debug_port" javaType="_int"/>
             <arg column="remote_debug_suspend" javaType="_boolean"/>
+            <arg column="owner_user_id" javaType="java.lang.String"/>
+            <arg column="owner_username" javaType="java.lang.String"/>
+            <arg column="owner_department_id" javaType="java.lang.Long"/>
+            <arg column="owner_department_name" javaType="java.lang.String"/>
             <arg column="started_at" javaType="java.time.LocalDateTime"/>
             <arg column="created_at" javaType="java.time.LocalDateTime"/>
             <arg column="updated_at" javaType="java.time.LocalDateTime"/>
         </constructor>
     </resultMap>
 
-    <select id="findByPluginId" resultMap="PluginRuntimeRowResultMap">
-        SELECT *
-        FROM plugin_runtime
-        WHERE plugin_id = #{pluginId}
-    </select>
+    <sql id="columns">
+        i.id, i.installation_id, i.plugin_id, i.instance_id, i.installation_name,
+        d.version, d.display_name, d.main_class, d.artifact_path, d.artifact_sha256,
+        i.runtime_type, i.state, i.runner_host, i.runner_port, i.work_dir,
+        d.capabilities_json, d.config_schema_json, d.account_schema_json, d.dependency_jars_json,
+        i.remote_debug_enabled, i.remote_debug_port, i.remote_debug_suspend,
+        i.owner_user_id, u.username AS owner_username, i.owner_dept_id AS owner_department_id,
+        dept.department_name AS owner_department_name, i.started_at, i.created_at, i.updated_at
+    </sql>
+    <sql id="joins">
+        FROM plugin_installation i
+        JOIN plugin_definition d ON d.plugin_id = i.plugin_id
+        LEFT JOIN sky_user u ON u.user_id = i.owner_user_id
+        JOIN sky_department dept ON dept.department_id = i.owner_dept_id
+    </sql>
+    <sql id="scope">
+        <if test="scope != null and !scope.all">
+            AND <choose>
+                <when test="scope.denied">1 = 0</when>
+                <otherwise>(
+                    <if test="scope.departmentIds != null and !scope.departmentIds.isEmpty()">
+                        i.owner_dept_id IN <foreach collection="scope.departmentIds" item="deptId" open="(" separator="," close=")">#{deptId}</foreach>
+                    </if>
+                    <if test="scope.self">
+                        <if test="scope.departmentIds != null and !scope.departmentIds.isEmpty()"> OR </if>
+                        i.owner_user_id = #{scope.userId}
+                    </if>
+                )</otherwise>
+            </choose>
+        </if>
+    </sql>
+    <sql id="filters">
+        AND i.deleted = FALSE
+        <if test="pluginId != null and pluginId != ''">AND i.plugin_id = #{pluginId}</if>
+        <if test="state != null and state != ''">AND i.state = #{state}</if>
+    </sql>
 
+    <select id="findByInstallationId" resultMap="PluginRuntimeRowResultMap">
+        SELECT <include refid="columns"/> <include refid="joins"/>
+        WHERE i.installation_id = #{installationId} AND i.deleted = FALSE
+    </select>
     <select id="listRuntimes" resultMap="PluginRuntimeRowResultMap">
-        SELECT *
-        FROM plugin_runtime
-        <where>
-            <if test="pluginId != null and pluginId != ''">
-                plugin_id = #{pluginId}
-            </if>
-            <if test="state != null">
-                AND state = #{state}
-            </if>
-        </where>
-        ORDER BY id DESC
-        LIMIT #{limit} OFFSET #{offset}
+        SELECT <include refid="columns"/> <include refid="joins"/>
+        <where><include refid="filters"/><include refid="scope"/></where>
+        ORDER BY i.id DESC LIMIT #{limit} OFFSET #{offset}
     </select>
-
     <select id="countRuntimes" resultType="long">
-        SELECT COUNT(*)
-        FROM plugin_runtime
-        <where>
-            <if test="pluginId != null and pluginId != ''">
-                plugin_id = #{pluginId}
-            </if>
-            <if test="state != null">
-                AND state = #{state}
-            </if>
-        </where>
+        SELECT COUNT(*) <include refid="joins"/>
+        <where><include refid="filters"/><include refid="scope"/></where>
     </select>
-
     <select id="countRuntimesByState" resultMap="StatusCountRowResultMap">
-        SELECT state AS status, COUNT(*) AS total
-        FROM plugin_runtime
-        GROUP BY state
+        SELECT i.state AS status, COUNT(*) AS total <include refid="joins"/>
+        <where>AND i.deleted = FALSE <include refid="scope"/></where>
+        GROUP BY i.state
     </select>
 
     <sql id="optionFilters">
-        <where>
-            <if test="keyword != null and keyword != ''">
-                (plugin_id LIKE #{keywordLike} OR display_name LIKE #{keywordLike})
-            </if>
-            <if test="state != null and state != ''">
-                AND state = #{state}
-            </if>
-            <if test="usage == 'JOB'">
-                AND JSON_CONTAINS(capabilities_json, 'true', '$.task')
-            </if>
-            <if test="usage == 'CONFIG'">
-                AND JSON_CONTAINS(capabilities_json, 'true', '$.config')
-            </if>
-            <if test="usage == 'ACCOUNT'">
-                AND JSON_CONTAINS(capabilities_json, 'true', '$.account')
-            </if>
-            <if test="usage == 'NOTIFICATION'">
-                AND JSON_CONTAINS(capabilities_json, 'true', '$.notification')
-            </if>
-            <if test="usage == 'SERVICE'">
-                AND JSON_CONTAINS(capabilities_json, 'true', '$.service')
-            </if>
-        </where>
+        AND i.deleted = FALSE
+        <if test="keyword != null and keyword != ''">AND (i.installation_id LIKE #{keywordLike} OR i.installation_name LIKE #{keywordLike} OR i.plugin_id LIKE #{keywordLike} OR d.display_name LIKE #{keywordLike})</if>
+        <if test="state != null and state != ''">AND i.state = #{state}</if>
+        <if test="usage == 'JOB'">AND JSON_CONTAINS(d.capabilities_json, 'true', '$.task')</if>
+        <if test="usage == 'CONFIG'">AND JSON_CONTAINS(d.capabilities_json, 'true', '$.config')</if>
+        <if test="usage == 'ACCOUNT'">AND JSON_CONTAINS(d.capabilities_json, 'true', '$.account')</if>
+        <if test="usage == 'NOTIFICATION'">AND JSON_CONTAINS(d.capabilities_json, 'true', '$.notification')</if>
+        <if test="usage == 'SERVICE'">AND JSON_CONTAINS(d.capabilities_json, 'true', '$.service')</if>
     </sql>
-
     <select id="listOptions" resultMap="PluginRuntimeRowResultMap">
-        SELECT *
-        FROM plugin_runtime
-        <include refid="optionFilters"/>
-        ORDER BY plugin_id ASC
-        LIMIT #{limit} OFFSET #{offset}
+        SELECT <include refid="columns"/> <include refid="joins"/>
+        <where><include refid="optionFilters"/><include refid="scope"/></where>
+        ORDER BY i.installation_name, i.installation_id LIMIT #{limit} OFFSET #{offset}
     </select>
-
     <select id="countOptions" resultType="long">
-        SELECT COUNT(*)
-        FROM plugin_runtime
-        <include refid="optionFilters"/>
+        SELECT COUNT(*) <include refid="joins"/>
+        <where><include refid="optionFilters"/><include refid="scope"/></where>
     </select>
 
+    <insert id="insertInstallation">
+        INSERT INTO plugin_installation (
+            installation_id, plugin_id, instance_id, installation_name, runtime_type, state,
+            owner_user_id, owner_dept_id
+        ) VALUES (
+            #{installationId}, #{pluginId}, #{instanceId}, #{installationName}, 'process', 'STOPPED',
+            #{ownerUserId}, #{ownerDepartmentId}
+        )
+    </insert>
     <update id="updateLifecycle">
-        UPDATE plugin_runtime
-        SET state = #{state}, runner_host = #{runnerHost}, runner_port = #{runnerPort}, work_dir = #{workDir}, started_at = #{startedAt}, updated_at = CURRENT_TIMESTAMP
-        WHERE plugin_id = #{pluginId}
+        UPDATE plugin_installation SET state=#{state}, runner_host=#{runnerHost}, runner_port=#{runnerPort}, work_dir=#{workDir}, started_at=#{startedAt}, updated_at=CURRENT_TIMESTAMP
+        WHERE installation_id=#{installationId} AND deleted=FALSE
     </update>
-
     <update id="updateRemoteDebug">
-        UPDATE plugin_runtime
-        SET remote_debug_enabled = #{enabled}, remote_debug_port = #{port}, remote_debug_suspend = #{suspend}, updated_at = CURRENT_TIMESTAMP
-        WHERE plugin_id = #{pluginId}
+        UPDATE plugin_installation SET remote_debug_enabled=#{enabled}, remote_debug_port=#{port}, remote_debug_suspend=#{suspend}, updated_at=CURRENT_TIMESTAMP
+        WHERE installation_id=#{installationId} AND deleted=FALSE
     </update>
-
     <update id="stopStaleRunningRuntimes">
-        UPDATE plugin_runtime
-        SET state = 'STOPPED', runner_port = NULL, started_at = NULL, updated_at = CURRENT_TIMESTAMP
-        WHERE state IN ('STARTING', 'RUNNING')
+        UPDATE plugin_installation SET state='STOPPED', runner_port=NULL, started_at=NULL, updated_at=CURRENT_TIMESTAMP WHERE state IN ('STARTING','RUNNING') AND deleted=FALSE
     </update>
-
-    <delete id="deleteByPluginId">
-        DELETE FROM plugin_runtime
-        WHERE plugin_id = #{pluginId}
-    </delete>
+    <update id="softDelete">
+        UPDATE plugin_installation SET deleted=TRUE, state='STOPPED', runner_port=NULL, updated_at=CURRENT_TIMESTAMP WHERE installation_id=#{installationId} AND deleted=FALSE
+    </update>
+    <select id="notificationChannelIds" resultType="java.lang.String">
+        SELECT channel_id FROM plugin_installation_channel WHERE installation_id=#{installationId} ORDER BY channel_id
+    </select>
+    <select id="jobNotificationChannelIds" resultType="java.lang.String">
+        SELECT DISTINCT jc.channel_id
+        FROM job_notification_channel jc
+        JOIN job j ON j.id=jc.job_id
+        WHERE j.plugin_installation_id=#{installationId}
+        ORDER BY jc.channel_id
+    </select>
+    <delete id="deleteNotificationChannels">DELETE FROM plugin_installation_channel WHERE installation_id=#{installationId}</delete>
+    <insert id="insertNotificationChannel">
+        INSERT INTO plugin_installation_channel (installation_id, channel_id, created_by) VALUES (#{installationId}, #{channelId}, #{createdBy})
+    </insert>
+    <update id="transferOwnership">
+        UPDATE plugin_installation
+        SET owner_user_id=#{ownerUserId}, owner_dept_id=#{ownerDepartmentId}, updated_at=CURRENT_TIMESTAMP
+        WHERE installation_id=#{installationId} AND deleted=FALSE
+    </update>
 </mapper>

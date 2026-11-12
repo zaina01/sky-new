@@ -6,116 +6,116 @@
     <resultMap id="PluginAccountResultMap" type="com.sky.job.plugin.storage.PluginAccount">
         <constructor>
             <arg column="id" javaType="_long"/>
-            <arg column="plugin_id" javaType="java.lang.String"/>
+            <arg column="installation_id" javaType="java.lang.String"/>
             <arg column="account_id" javaType="java.lang.String"/>
             <arg column="display_name" javaType="java.lang.String"/>
             <arg column="account_json" javaType="java.lang.String"/>
             <arg column="enabled" javaType="_boolean"/>
             <arg column="created_at" javaType="java.time.LocalDateTime"/>
             <arg column="updated_at" javaType="java.time.LocalDateTime"/>
+            <arg column="group_id" javaType="java.lang.Long"/>
+            <arg column="group_name" javaType="java.lang.String"/>
         </constructor>
     </resultMap>
 
-    <select id="listByPluginId" resultMap="PluginAccountResultMap">
-        SELECT *
-        FROM plugin_account
-        WHERE plugin_id = #{pluginId}
-        ORDER BY account_id
+    <select id="listByInstallationId" resultMap="PluginAccountResultMap">
+        SELECT a.*, g.name AS group_name
+        FROM plugin_account a
+        LEFT JOIN plugin_account_group g ON g.installation_id = a.installation_id AND g.group_id = a.group_id
+        WHERE a.installation_id = #{installationId}
+        ORDER BY a.account_id
     </select>
 
-    <select id="listEnabledByPluginId" resultMap="PluginAccountResultMap">
-        SELECT *
-        FROM plugin_account
-        WHERE plugin_id = #{pluginId} AND enabled = TRUE
-        ORDER BY account_id
+    <select id="listEnabledByInstallationId" resultMap="PluginAccountResultMap">
+        SELECT a.*, g.name AS group_name
+        FROM plugin_account a
+        LEFT JOIN plugin_account_group g ON g.installation_id = a.installation_id AND g.group_id = a.group_id
+        WHERE a.installation_id = #{installationId} AND enabled = TRUE
+        ORDER BY a.account_id
     </select>
 
     <select id="getRecord" resultMap="PluginAccountResultMap">
-        SELECT *
-        FROM plugin_account
-        WHERE plugin_id = #{pluginId} AND account_id = #{accountId}
+        SELECT a.*, g.name AS group_name
+        FROM plugin_account a
+        LEFT JOIN plugin_account_group g ON g.installation_id = a.installation_id AND g.group_id = a.group_id
+        WHERE a.installation_id = #{installationId} AND account_id = #{accountId}
     </select>
 
     <select id="getEnabledRecord" resultMap="PluginAccountResultMap">
-        SELECT *
-        FROM plugin_account
-        WHERE plugin_id = #{pluginId} AND account_id = #{accountId} AND enabled = TRUE
+        SELECT a.*, g.name AS group_name
+        FROM plugin_account a
+        LEFT JOIN plugin_account_group g ON g.installation_id = a.installation_id AND g.group_id = a.group_id
+        WHERE a.installation_id = #{installationId} AND account_id = #{accountId} AND enabled = TRUE
     </select>
 
-    <select id="listManaged" resultMap="PluginAccountResultMap">
-        SELECT *
-        FROM plugin_account
+    <sql id="managedScope">
         <where>
-            plugin_id = #{pluginId}
+            a.installation_id = #{installationId}
             <if test="enabled != null">
-                AND enabled = #{enabled}
+                AND a.enabled = #{enabled}
             </if>
             <if test="accountId != null and accountId != ''">
-                AND account_id LIKE #{accountIdLike}
+                AND a.account_id LIKE #{accountIdLike}
             </if>
             <if test="displayName != null and displayName != ''">
-                AND display_name LIKE #{displayNameLike}
+                AND a.display_name LIKE #{displayNameLike}
             </if>
+            <if test="groupId != null">AND a.group_id = #{groupId}</if>
+            <if test="ungrouped">AND a.group_id IS NULL</if>
         </where>
-        ORDER BY account_id ASC
+    </sql>
+
+    <select id="listManaged" resultMap="PluginAccountResultMap">
+        SELECT a.*, g.name AS group_name
+        FROM plugin_account a
+        LEFT JOIN plugin_account_group g ON g.installation_id = a.installation_id AND g.group_id = a.group_id
+        <include refid="managedScope"/>
+        ORDER BY a.created_at ASC, a.id ASC
         LIMIT #{limit} OFFSET #{offset}
     </select>
 
     <select id="listManagedForExport" resultMap="PluginAccountResultMap">
-        SELECT *
-        FROM plugin_account
-        <where>
-            plugin_id = #{pluginId}
-            <if test="enabled != null">
-                AND enabled = #{enabled}
-            </if>
-            <if test="accountId != null and accountId != ''">
-                AND account_id LIKE #{accountIdLike}
-            </if>
-            <if test="displayName != null and displayName != ''">
-                AND display_name LIKE #{displayNameLike}
-            </if>
-        </where>
-        ORDER BY account_id ASC
+        SELECT a.*, g.name AS group_name
+        FROM plugin_account a
+        LEFT JOIN plugin_account_group g ON g.installation_id = a.installation_id AND g.group_id = a.group_id
+        <include refid="managedScope"/>
+        ORDER BY a.created_at ASC, a.id ASC
         LIMIT #{limit}
     </select>
 
     <select id="countManaged" resultType="long">
         SELECT COUNT(*)
-        FROM plugin_account
-        <where>
-            plugin_id = #{pluginId}
-            <if test="enabled != null">
-                AND enabled = #{enabled}
-            </if>
-            <if test="accountId != null and accountId != ''">
-                AND account_id LIKE #{accountIdLike}
-            </if>
-            <if test="displayName != null and displayName != ''">
-                AND display_name LIKE #{displayNameLike}
-            </if>
-        </where>
+        FROM plugin_account a
+        <include refid="managedScope"/>
     </select>
 
     <insert id="upsert">
-        INSERT INTO plugin_account (plugin_id, account_id, display_name, account_json, enabled)
-        VALUES (#{pluginId}, #{accountId}, #{displayName}, CAST(#{accountJson} AS JSON), #{enabled})
+        INSERT INTO plugin_account (installation_id, account_id, display_name, account_json, enabled)
+        VALUES (#{installationId}, #{accountId}, #{displayName}, CAST(#{accountJson} AS JSON), #{enabled})
         ON DUPLICATE KEY UPDATE display_name = VALUES(display_name), account_json = VALUES(account_json), enabled = VALUES(enabled), updated_at = CURRENT_TIMESTAMP
     </insert>
 
     <update id="updateEnabled">
         UPDATE plugin_account
         SET enabled = #{enabled}, updated_at = CURRENT_TIMESTAMP
-        WHERE plugin_id = #{pluginId} AND account_id = #{accountId}
+        WHERE installation_id = #{installationId} AND account_id = #{accountId}
     </update>
 
     <delete id="delete">
         DELETE FROM plugin_account
-        WHERE plugin_id = #{pluginId} AND account_id = #{accountId}
+        WHERE installation_id = #{installationId} AND account_id = #{accountId}
     </delete>
 
-    <delete id="deleteByPluginId">
+    <delete id="deleteByInstallationId">
         DELETE FROM plugin_account
-        WHERE plugin_id = #{pluginId}
+        WHERE installation_id = #{installationId}
     </delete>
+    <update id="updateGroup">
+        UPDATE plugin_account SET group_id = #{groupId}, updated_at = CURRENT_TIMESTAMP
+        WHERE installation_id = #{installationId} AND account_id = #{accountId}
+    </update>
+    <update id="clearGroup">
+        UPDATE plugin_account SET group_id = NULL, updated_at = CURRENT_TIMESTAMP
+        WHERE installation_id = #{installationId} AND group_id = #{groupId}
+    </update>
 </mapper>

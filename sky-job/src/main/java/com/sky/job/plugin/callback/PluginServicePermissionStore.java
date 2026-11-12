@@ -1,6 +1,7 @@
 package com.sky.job.plugin.callback;
 
 import com.sky.job.plugin.callback.mapper.PluginServicePermissionMapper;
+import com.sky.job.security.EffectiveDataScope;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
@@ -14,26 +15,30 @@ public class PluginServicePermissionStore {
         this.mapper = mapper;
     }
 
-    public boolean isAllowed(String callerPluginId, String targetPluginId, String operation) {
-        return mapper.countEnabled(callerPluginId, targetPluginId, operation) > 0;
+    public boolean isAllowed(String callerInstallationId, String targetInstallationId, String operation) {
+        return mapper.countEnabled(callerInstallationId, targetInstallationId, operation) > 0;
     }
 
-    public List<PluginServicePermission> list(String callerPluginId, String targetPluginId, String operation, Boolean enabled, Integer page, Integer size) {
+    public List<String> authorizedTargetInstallationIds(String callerInstallationId, String targetPluginId, String operation) {
+        return mapper.authorizedTargetInstallationIds(callerInstallationId, targetPluginId, operation);
+    }
+
+    public List<PluginServicePermission> list(String callerInstallationId, String callerPluginId, String targetInstallationId, String targetPluginId, String operation, Boolean enabled, EffectiveDataScope scope, Integer page, Integer size) {
         int normalizedPage = Math.max(page == null ? 1 : page, 1);
         int normalizedSize = Math.min(Math.max(size == null ? 20 : size, 1), 100);
-        return mapper.list(trim(callerPluginId), trim(targetPluginId), trim(operation), enabled, normalizedSize, (normalizedPage - 1) * normalizedSize);
+        return mapper.list(trim(callerInstallationId), trim(callerPluginId), trim(targetInstallationId), trim(targetPluginId), trim(operation), enabled, scope, normalizedSize, (normalizedPage - 1) * normalizedSize);
     }
 
-    public long count(String callerPluginId, String targetPluginId, String operation, Boolean enabled) {
-        return mapper.count(trim(callerPluginId), trim(targetPluginId), trim(operation), enabled);
+    public long count(String callerInstallationId, String callerPluginId, String targetInstallationId, String targetPluginId, String operation, Boolean enabled, EffectiveDataScope scope) {
+        return mapper.count(trim(callerInstallationId), trim(callerPluginId), trim(targetInstallationId), trim(targetPluginId), trim(operation), enabled, scope);
     }
 
-    public Optional<PluginServicePermission> findById(long id) {
-        return Optional.ofNullable(mapper.findById(id));
+    public Optional<PluginServicePermission> findById(long id, EffectiveDataScope scope) {
+        return Optional.ofNullable(mapper.findById(id, scope));
     }
 
-    public void upsert(String callerPluginId, String targetPluginId, String operation, boolean enabled) {
-        mapper.upsert(callerPluginId, targetPluginId, operation, enabled);
+    public void upsert(String callerInstallationId, String targetInstallationId, String operation, boolean enabled) {
+        mapper.upsert(callerInstallationId, targetInstallationId, operation, enabled);
     }
 
     public int updateEnabled(long id, boolean enabled) {

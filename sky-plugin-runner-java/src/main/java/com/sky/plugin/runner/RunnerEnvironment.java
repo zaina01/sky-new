@@ -6,6 +6,7 @@ import java.util.List;
 import java.util.Map;
 
 record RunnerEnvironment(
+        String installationId,
         String pluginId,
         String instanceId,
         String mainClass,
@@ -33,6 +34,7 @@ record RunnerEnvironment(
             dependencyPaths.add(Path.of(args[index]).toAbsolutePath().normalize());
         }
         return new RunnerEnvironment(
+                required(env, "SKY_PLUGIN_INSTALLATION_ID"),
                 required(env, "SKY_PLUGIN_ID"),
                 required(env, "SKY_PLUGIN_INSTANCE_ID"),
                 env.getOrDefault("SKY_PLUGIN_MAIN_CLASS", ""),

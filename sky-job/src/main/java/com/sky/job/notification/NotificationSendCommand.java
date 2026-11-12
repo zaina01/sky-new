@@ -6,10 +6,13 @@ import java.util.Map;
 public record NotificationSendCommand(
         NotificationSourceType sourceType,
         String requestId,
+        String installationId,
         String pluginId,
         String instanceId,
         String jobId,
         Long executionId,
+        String sourceOwnerUserId,
+        Long sourceOwnerDepartmentId,
         List<String> channelIds,
         String title,
         String content,

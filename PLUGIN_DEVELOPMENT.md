@@ -411,6 +411,21 @@ public class ProductConfig {
 
         @ConfigField(label = "排序序号", type = ConfigFieldType.NUMBER, required = true)
         private Integer sortOrder;
+
+        @ConfigField(
+                label = "规格列表",
+                type = ConfigFieldType.OBJECT_LIST,
+                itemClass = VariantItem.class
+        )
+        private List<VariantItem> variants;
+    }
+
+    public static class VariantItem {
+        @ConfigField(label = "规格名", required = true)
+        private String name;
+
+        @ConfigField(label = "库存", type = ConfigFieldType.NUMBER, required = true)
+        private Integer stock;
     }
 }
 ```
@@ -441,6 +456,31 @@ public class ProductConfig {
             "type": "NUMBER",
             "required": true,
             "options": []
+          },
+          {
+            "name": "variants",
+            "label": "规格列表",
+            "type": "OBJECT_LIST",
+            "required": false,
+            "options": [],
+            "itemSchema": {
+              "fields": [
+                {
+                  "name": "name",
+                  "label": "规格名",
+                  "type": "TEXT",
+                  "required": true,
+                  "options": []
+                },
+                {
+                  "name": "stock",
+                  "label": "库存",
+                  "type": "NUMBER",
+                  "required": true,
+                  "options": []
+                }
+              ]
+            }
           }
         ]
       }
@@ -454,8 +494,14 @@ public class ProductConfig {
 ```json
 {
   "products": [
-    {"productName": "商品A", "sortOrder": 1},
-    {"productName": "商品B", "sortOrder": 2}
+    {
+      "productName": "商品A",
+      "sortOrder": 1,
+      "variants": [
+        {"name": "红色", "stock": 10},
+        {"name": "蓝色", "stock": 8}
+      ]
+    }
   ]
 }
 ```
@@ -466,11 +512,12 @@ public class ProductConfig {
 - `itemClass` 必须是当前插件 jar 内的类。
 - `itemClass` 不要求带 `@PluginConfig`，但至少要有一个字段声明 `@ConfigField`。
 - `OBJECT_LIST` 不能设置 `options`。
-- 第一版不支持嵌套 `OBJECT_LIST`。
+- `OBJECT_LIST` 可以递归嵌套，顶层对象列表计为第 1 层，最多 16 层。
+- `itemClass` 不能引用当前递归链中的祖先类；不同 sibling 分支可以复用同一个 item 类。
 - 非 `OBJECT_LIST` 字段不能设置 `itemClass`。
 - 子字段的 `visibleWhen` 只能引用同一行 item 内的 sibling 字段。
 
-前端渲染建议：`OBJECT_LIST` 渲染为可新增/删除行的成组列表控件，每一行按 `itemSchema.fields` 复用现有字段渲染器；父字段 `required` 表示数组至少一行，子字段 `required` 表示每一行里可见子字段必填。
+前端渲染建议：`OBJECT_LIST` 渲染为可新增/删除行的成组列表控件，每一行按 `itemSchema.fields` 复用现有字段渲染器；遇到子字段 `type = OBJECT_LIST` 时继续递归渲染其 `itemSchema`。每一层父字段的 `required` 都表示对应数组至少一行，子字段 `required` 表示该行里可见字段必填。
 
 ### 8.5 读取配置
 
@@ -613,6 +660,21 @@ public static class Credential {
 
     @AccountField(label = "Token", type = AccountFieldType.PASSWORD, sensitive = true)
     private String token;
+
+    @AccountField(
+            label = "请求头",
+            type = AccountFieldType.OBJECT_LIST,
+            itemClass = Header.class
+    )
+    private List<Header> headers;
+}
+
+public static class Header {
+    @AccountField(label = "名称", required = true)
+    private String name;
+
+    @AccountField(label = "值", sensitive = true)
+    private String value;
 }
 ```
 
@@ -620,9 +682,10 @@ public static class Credential {
 
 - 必须设置 `itemClass`，且该类必须位于当前插件 jar 内。
 - item 类不要求带 `@PluginAccount`，但至少要有一个字段声明 `@AccountField`。
-- `OBJECT_LIST` 不能设置 `options`，暂不支持嵌套。
+- `OBJECT_LIST` 不能设置 `options`，可以递归嵌套且最多 16 层。
+- `itemClass` 不能引用当前递归链中的祖先类；不同 sibling 分支可以复用同一个 item 类。
 - 非 `OBJECT_LIST` 字段不能设置 `itemClass`。
-- item 字段不能声明 `@AccountId`。
+- 任意层 item 字段都不能声明 `@AccountId`。
 - 子字段的 `visibleWhen` 只能引用同一行 item 内的 sibling 字段。
 
 ### 9.4 声明账户能力

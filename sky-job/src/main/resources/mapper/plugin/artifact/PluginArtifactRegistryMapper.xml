@@ -3,26 +3,56 @@
         PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="com.sky.job.plugin.artifact.mapper.PluginArtifactRegistryMapper">
-    <insert id="upsertRuntime">
-        INSERT INTO plugin_runtime (
-            plugin_id, instance_id, version, display_name, main_class, artifact_path, artifact_sha256,
-            runtime_type, state, capabilities_json, config_schema_json, account_schema_json, dependency_jars_json
+    <insert id="upsertDefinition">
+        INSERT INTO plugin_definition (
+            plugin_id, version, display_name, main_class, artifact_path, artifact_sha256,
+            capabilities_json, config_schema_json, account_schema_json, dependency_jars_json, uploaded_by
         ) VALUES (
-            #{pluginId}, #{instanceId}, #{version}, #{displayName}, #{mainClass}, #{artifactPath}, #{artifactSha256},
-            'process', 'STOPPED', CAST(#{capabilitiesJson} AS JSON), CAST(#{configSchemaJson} AS JSON), CAST(#{accountSchemaJson} AS JSON), CAST(#{dependencyJarsJson} AS JSON)
+            #{pluginId}, #{version}, #{displayName}, #{mainClass}, #{artifactPath}, #{artifactSha256},
+            CAST(#{capabilitiesJson} AS JSON), CAST(#{configSchemaJson} AS JSON), CAST(#{accountSchemaJson} AS JSON), CAST(#{dependencyJarsJson} AS JSON), #{uploadedBy}
         )
         ON DUPLICATE KEY UPDATE
-            instance_id = VALUES(instance_id), version = VALUES(version), display_name = VALUES(display_name),
+            version = VALUES(version), display_name = VALUES(display_name),
             main_class = VALUES(main_class), artifact_path = VALUES(artifact_path), artifact_sha256 = VALUES(artifact_sha256),
-            runtime_type = VALUES(runtime_type), state = 'STOPPED', runner_port = NULL, started_at = NULL, capabilities_json = VALUES(capabilities_json),
+            capabilities_json = VALUES(capabilities_json),
             config_schema_json = VALUES(config_schema_json), account_schema_json = VALUES(account_schema_json),
             dependency_jars_json = CASE WHEN #{overwriteDependencies} THEN VALUES(dependency_jars_json) ELSE dependency_jars_json END,
-            remote_debug_enabled = FALSE, remote_debug_port = 5005, remote_debug_suspend = TRUE
+            uploaded_by = VALUES(uploaded_by), updated_at = CURRENT_TIMESTAMP
     </insert>
 
     <update id="updateDependencyJars">
-        UPDATE plugin_runtime
+        UPDATE plugin_definition
         SET dependency_jars_json = CAST(#{dependencyJarsJson} AS JSON), updated_at = CURRENT_TIMESTAMP
         WHERE plugin_id = #{pluginId}
     </update>
+
+    <resultMap id="PluginDefinitionResultMap" type="com.sky.job.plugin.artifact.PluginDefinition">
+        <constructor>
+            <arg column="plugin_id" javaType="java.lang.String"/>
+            <arg column="version" javaType="java.lang.String"/>
+            <arg column="display_name" javaType="java.lang.String"/>
+            <arg column="main_class" javaType="java.lang.String"/>
+            <arg column="artifact_path" javaType="java.lang.String"/>
+            <arg column="artifact_sha256" javaType="java.lang.String"/>
+            <arg column="capabilities_json" javaType="java.lang.String"/>
+            <arg column="config_schema_json" javaType="java.lang.String"/>
+            <arg column="account_schema_json" javaType="java.lang.String"/>
+            <arg column="dependency_jars_json" javaType="java.lang.String"/>
+            <arg column="uploaded_by" javaType="java.lang.String"/>
+            <arg column="created_at" javaType="java.time.LocalDateTime"/>
+            <arg column="updated_at" javaType="java.time.LocalDateTime"/>
+        </constructor>
+    </resultMap>
+    <select id="findDefinition" resultMap="PluginDefinitionResultMap">SELECT * FROM plugin_definition WHERE plugin_id = #{pluginId}</select>
+    <select id="listDefinitions" resultMap="PluginDefinitionResultMap">
+        SELECT * FROM plugin_definition
+        <if test="keyword != null and keyword != ''">WHERE plugin_id LIKE #{keywordLike} OR display_name LIKE #{keywordLike}</if>
+        ORDER BY plugin_id LIMIT #{limit} OFFSET #{offset}
+    </select>
+    <select id="countDefinitions" resultType="long">
+        SELECT COUNT(*) FROM plugin_definition
+        <if test="keyword != null and keyword != ''">WHERE plugin_id LIKE #{keywordLike} OR display_name LIKE #{keywordLike}</if>
+    </select>
+    <select id="countInstallations" resultType="int">SELECT COUNT(*) FROM plugin_installation WHERE plugin_id = #{pluginId} AND deleted = FALSE</select>
+    <delete id="deleteDefinition">DELETE FROM plugin_definition WHERE plugin_id = #{pluginId}</delete>
 </mapper>

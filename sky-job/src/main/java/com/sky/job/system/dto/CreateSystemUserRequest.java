@@ -8,6 +8,7 @@ public record CreateSystemUserRequest(
         String email,
         String phone,
         String avatar,
+        Long departmentId,
         Boolean enabled,
         Set<String> roles
 ) {

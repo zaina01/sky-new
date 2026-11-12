@@ -23,6 +23,10 @@ import com.sky.job.system.dto.SystemOverviewResponse;
 import com.sky.job.system.dto.TrendOverviewResponse;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import com.sky.job.security.AuthenticatedUser;
+import com.sky.job.security.DataScopeService;
+import com.sky.job.security.EffectiveDataScope;
+import com.sky.job.security.PermissionNames;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -49,15 +53,17 @@ public class SystemOverviewService {
     private final JobExecutionStore jobExecutionStore;
     private final NotificationSendHistoryStore notificationHistoryStore;
     private final Supplier<LocalDateTime> nowSupplier;
+    private final DataScopeService dataScopeService;
 
     @Autowired
     public SystemOverviewService(
             PluginRuntimeMetadataStore pluginRuntimeStore,
             JobStore jobStore,
             JobExecutionStore jobExecutionStore,
-            NotificationSendHistoryStore notificationHistoryStore
+            NotificationSendHistoryStore notificationHistoryStore,
+            DataScopeService dataScopeService
     ) {
-        this(pluginRuntimeStore, jobStore, jobExecutionStore, notificationHistoryStore, LocalDateTime::now);
+        this(pluginRuntimeStore, jobStore, jobExecutionStore, notificationHistoryStore, dataScopeService, LocalDateTime::now);
     }
 
     SystemOverviewService(
@@ -65,20 +71,26 @@ public class SystemOverviewService {
             JobStore jobStore,
             JobExecutionStore jobExecutionStore,
             NotificationSendHistoryStore notificationHistoryStore,
+            DataScopeService dataScopeService,
             Supplier<LocalDateTime> nowSupplier
     ) {
         this.pluginRuntimeStore = pluginRuntimeStore;
         this.jobStore = jobStore;
         this.jobExecutionStore = jobExecutionStore;
         this.notificationHistoryStore = notificationHistoryStore;
+        this.dataScopeService = dataScopeService;
         this.nowSupplier = nowSupplier;
     }
 
     public SystemOverviewResponse overview() {
-        return overview(null, null, null);
+        return overview(EffectiveDataScope.all("test"), null, null, null);
     }
 
-    public SystemOverviewResponse overview(Integer windowHours, Integer trendDays, Integer recentLimit) {
+    public SystemOverviewResponse overview(AuthenticatedUser user, Integer windowHours, Integer trendDays, Integer recentLimit) {
+        return overview(dataScopeService.resolve(user, PermissionNames.SYSTEM_OVERVIEW_READ), windowHours, trendDays, recentLimit);
+    }
+
+    private SystemOverviewResponse overview(EffectiveDataScope scope, Integer windowHours, Integer trendDays, Integer recentLimit) {
         int normalizedWindowHours = clamp(windowHours, DEFAULT_WINDOW_HOURS, MIN_WINDOW_HOURS, MAX_WINDOW_HOURS);
         int normalizedTrendDays = clamp(trendDays, DEFAULT_TREND_DAYS, MIN_TREND_DAYS, MAX_TREND_DAYS);
         int normalizedRecentLimit = clamp(recentLimit, DEFAULT_RECENT_LIMIT, MIN_RECENT_LIMIT, MAX_RECENT_LIMIT);
@@ -91,25 +103,25 @@ public class SystemOverviewService {
         LocalDateTime trendEndTime = trendEndDate.atStartOfDay();
 
         return new SystemOverviewResponse(
-                pluginRuntimeStore.countRuntimes(null, null),
-                jobStore.countByStatus(JobStatus.ENABLED),
-                jobExecutionStore.count(null, null, JobExecutionStatus.FAILED),
-                notificationHistoryStore.countByStatus(NotificationSendStatus.RETRY_WAITING),
+                pluginRuntimeStore.countRuntimes(null, null, scope),
+                jobStore.countByStatus(JobStatus.ENABLED, scope),
+                jobExecutionStore.count(null, null, null, JobExecutionStatus.FAILED, scope),
+                notificationHistoryStore.countByStatus(NotificationSendStatus.RETRY_WAITING, scope),
                 new OverviewWindowResponse(normalizedWindowHours, startTime, endTime, normalizedTrendDays, normalizedRecentLimit),
-                statusCounts(PluginRuntimeState.values(), pluginRuntimeStore.countRuntimesByState()),
-                statusCounts(JobStatus.values(), jobStore.countByJobStatus()),
-                statusCounts(ExecutedStatus.values(), jobStore.countByExecutedStatus()),
-                statusCounts(JobExecutionStatus.values(), jobExecutionStore.countByStatusBetween(startTime, endTime)),
-                statusCounts(NotificationSendStatus.values(), notificationHistoryStore.countByStatusBetween(startTime, endTime)),
+                statusCounts(PluginRuntimeState.values(), pluginRuntimeStore.countRuntimesByState(scope)),
+                statusCounts(JobStatus.values(), jobStore.countByJobStatus(scope)),
+                statusCounts(ExecutedStatus.values(), jobStore.countByExecutedStatus(scope)),
+                statusCounts(JobExecutionStatus.values(), jobExecutionStore.countByStatusBetween(startTime, endTime, scope)),
+                statusCounts(NotificationSendStatus.values(), notificationHistoryStore.countByStatusBetween(startTime, endTime, scope)),
                 new TrendOverviewResponse(
-                        dailyStatusCounts(JobExecutionStatus.values(), jobExecutionStore.countDailyByStatus(trendStartTime, trendEndTime), trendStartDate, normalizedTrendDays),
-                        dailyStatusCounts(NotificationSendStatus.values(), notificationHistoryStore.countDailyByStatus(trendStartTime, trendEndTime), trendStartDate, normalizedTrendDays)
+                        dailyStatusCounts(JobExecutionStatus.values(), jobExecutionStore.countDailyByStatus(trendStartTime, trendEndTime, scope), trendStartDate, normalizedTrendDays),
+                        dailyStatusCounts(NotificationSendStatus.values(), notificationHistoryStore.countDailyByStatus(trendStartTime, trendEndTime, scope), trendStartDate, normalizedTrendDays)
                 ),
                 new RecentFailuresResponse(
-                        jobExecutionStore.listRecentFailures(List.of(JobExecutionStatus.FAILED, JobExecutionStatus.TIMEOUT, JobExecutionStatus.SYSTEM_EXIT), normalizedRecentLimit).stream()
+                        jobExecutionStore.listRecentFailures(List.of(JobExecutionStatus.FAILED, JobExecutionStatus.TIMEOUT, JobExecutionStatus.SYSTEM_EXIT), scope, normalizedRecentLimit).stream()
                                 .map(this::recentJobExecutionFailure)
                                 .toList(),
-                        notificationHistoryStore.listRecentFailures(normalizedRecentLimit).stream()
+                        notificationHistoryStore.listRecentFailures(scope, normalizedRecentLimit).stream()
                                 .map(this::recentNotificationFailure)
                                 .toList()
                 )

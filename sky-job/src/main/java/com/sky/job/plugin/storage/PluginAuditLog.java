@@ -4,6 +4,7 @@ import java.time.LocalDateTime;
 
 public record PluginAuditLog(
         Long id,
+        String installationId,
         String pluginId,
         String instanceId,
         String actor,

@@ -16,6 +16,9 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 
+import static org.springframework.security.authorization.AuthorizationManagers.allOf;
+import static org.springframework.security.authorization.AuthorityAuthorizationManager.hasAuthority;
+
 @Configuration
 @EnableWebSecurity
 @EnableConfigurationProperties(SkySecurityProperties.class)
@@ -48,9 +51,16 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.GET, "/system/roles", "/system/roles/**").hasAuthority(PermissionNames.SYSTEM_ROLE_READ)
                         .requestMatchers(HttpMethod.POST, "/system/roles").hasAuthority(PermissionNames.SYSTEM_ROLE_WRITE)
                         .requestMatchers(HttpMethod.PUT, "/system/roles/*/permissions").hasAuthority(PermissionNames.SYSTEM_ROLE_WRITE)
+                        .requestMatchers(HttpMethod.PUT, "/system/roles/*/data-scope").hasAuthority(PermissionNames.SYSTEM_ROLE_WRITE)
                         .requestMatchers(HttpMethod.PUT, "/system/roles/*").hasAuthority(PermissionNames.SYSTEM_ROLE_WRITE)
                         .requestMatchers(HttpMethod.DELETE, "/system/roles/*").hasAuthority(PermissionNames.SYSTEM_ROLE_DELETE)
                         .requestMatchers(HttpMethod.GET, "/system/permissions", "/system/permissions/**").hasAuthority(PermissionNames.SYSTEM_PERMISSION_READ)
+                        .requestMatchers(HttpMethod.GET, "/system/departments", "/system/departments/**").hasAuthority(PermissionNames.SYSTEM_DEPARTMENT_READ)
+                        .requestMatchers(HttpMethod.POST, "/system/departments").hasAuthority(PermissionNames.SYSTEM_DEPARTMENT_WRITE)
+                        .requestMatchers(HttpMethod.PUT, "/system/departments/*").hasAuthority(PermissionNames.SYSTEM_DEPARTMENT_WRITE)
+                        .requestMatchers(HttpMethod.PATCH, "/system/departments/*/enabled").hasAuthority(PermissionNames.SYSTEM_DEPARTMENT_WRITE)
+                        .requestMatchers(HttpMethod.DELETE, "/system/departments/*").hasAuthority(PermissionNames.SYSTEM_DEPARTMENT_DELETE)
+                        .requestMatchers(HttpMethod.POST, "/system/data-ownership/transfer").hasAuthority(PermissionNames.SYSTEM_DATA_OWNERSHIP_TRANSFER)
                         .requestMatchers(HttpMethod.GET, "/system/overview").hasAuthority(PermissionNames.SYSTEM_OVERVIEW_READ)
                         .requestMatchers(HttpMethod.GET, "/system/login-logs", "/system/login-logs/**").hasAuthority(PermissionNames.SYSTEM_LOGIN_LOG_READ)
                         .requestMatchers(HttpMethod.GET, "/system/logs", "/system/logs/**").hasAuthority(PermissionNames.SYSTEM_LOG_READ)
@@ -74,34 +84,56 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.GET, "/plugins/dependencies/local-artifacts").hasAuthority(PermissionNames.PLUGIN_RUNTIME_READ)
                         .requestMatchers(HttpMethod.POST, "/plugins/dependencies/local-artifacts").hasAuthority(PermissionNames.PLUGIN_RUNTIME_MANAGE)
                         .requestMatchers(HttpMethod.GET, "/plugins/options").hasAuthority(PermissionNames.PLUGIN_RUNTIME_READ)
+                        .requestMatchers(HttpMethod.GET, "/plugins/definitions", "/plugins/definitions/*").hasAuthority(PermissionNames.PLUGIN_RUNTIME_READ)
+                        .requestMatchers(HttpMethod.DELETE, "/plugins/definitions/*").hasAuthority(PermissionNames.PLUGIN_RUNTIME_MANAGE)
+                        .requestMatchers(HttpMethod.GET, "/plugins/definitions/*/dependencies").hasAuthority(PermissionNames.PLUGIN_RUNTIME_READ)
+                        .requestMatchers(HttpMethod.POST, "/plugins/definitions/*/dependencies/install", "/plugins/definitions/*/dependencies/reinstall").hasAuthority(PermissionNames.PLUGIN_RUNTIME_MANAGE)
+                        .requestMatchers(HttpMethod.DELETE, "/plugins/definitions/*/dependencies").hasAuthority(PermissionNames.PLUGIN_RUNTIME_MANAGE)
                         .requestMatchers(HttpMethod.GET, "/plugins/audit-logs", "/plugins/audit-logs/**").hasAuthority(PermissionNames.PLUGIN_AUDIT_READ)
                         .requestMatchers(HttpMethod.GET, "/plugin-service/calls", "/plugin-service/calls/**").hasAuthority(PermissionNames.PLUGIN_AUDIT_READ)
                         .requestMatchers(HttpMethod.GET, "/plugin-service/permissions", "/plugin-service/permissions/**").hasAuthority(PermissionNames.PLUGIN_SERVICE_PERMISSION_READ)
-                        .requestMatchers(HttpMethod.POST, "/plugin-service/permissions").hasAuthority(PermissionNames.PLUGIN_SERVICE_PERMISSION_WRITE)
+                        .requestMatchers(HttpMethod.POST, "/plugin-service/permissions", "/plugin-service/permissions/batch").hasAuthority(PermissionNames.PLUGIN_SERVICE_PERMISSION_WRITE)
                         .requestMatchers(HttpMethod.PATCH, "/plugin-service/permissions/*/enabled").hasAuthority(PermissionNames.PLUGIN_SERVICE_PERMISSION_WRITE)
                         .requestMatchers(HttpMethod.DELETE, "/plugin-service/permissions/*").hasAuthority(PermissionNames.PLUGIN_SERVICE_PERMISSION_WRITE)
-                        .requestMatchers(HttpMethod.GET, "/plugins/runtimes/**").hasAuthority(PermissionNames.PLUGIN_RUNTIME_READ)
-                        .requestMatchers(HttpMethod.DELETE, "/plugins/runtimes/*").hasAuthority(PermissionNames.PLUGIN_RUNTIME_MANAGE)
-                        .requestMatchers(HttpMethod.PUT, "/plugins/runtimes/*/debug").hasAuthority(PermissionNames.PLUGIN_RUNTIME_MANAGE)
-                        .requestMatchers(HttpMethod.POST, "/plugins/runtimes/*/start").hasAuthority(PermissionNames.PLUGIN_RUNTIME_MANAGE)
-                        .requestMatchers(HttpMethod.POST, "/plugins/runtimes/*/stop").hasAuthority(PermissionNames.PLUGIN_RUNTIME_MANAGE)
-                        .requestMatchers(HttpMethod.POST, "/plugins/runtimes/*/restart").hasAuthority(PermissionNames.PLUGIN_RUNTIME_MANAGE)
-                        .requestMatchers(HttpMethod.GET, "/plugins/*/dependencies").hasAuthority(PermissionNames.PLUGIN_RUNTIME_READ)
-                        .requestMatchers(HttpMethod.POST, "/plugins/*/dependencies/install", "/plugins/*/dependencies/reinstall").hasAuthority(PermissionNames.PLUGIN_RUNTIME_MANAGE)
-                        .requestMatchers(HttpMethod.DELETE, "/plugins/*/dependencies").hasAuthority(PermissionNames.PLUGIN_RUNTIME_MANAGE)
-                        .requestMatchers(HttpMethod.GET, "/plugins/*/config").hasAuthority(PermissionNames.PLUGIN_CONFIG_READ)
-                        .requestMatchers(HttpMethod.PUT, "/plugins/*/config").hasAuthority(PermissionNames.PLUGIN_CONFIG_WRITE)
-                        .requestMatchers(HttpMethod.GET, "/plugins/*/accounts/**").hasAuthority(PermissionNames.PLUGIN_ACCOUNT_READ)
-                        .requestMatchers(HttpMethod.POST, "/plugins/*/accounts/import").hasAuthority(PermissionNames.PLUGIN_ACCOUNT_WRITE)
-                        .requestMatchers(HttpMethod.POST, "/plugins/*/accounts").hasAuthority(PermissionNames.PLUGIN_ACCOUNT_WRITE)
-                        .requestMatchers(HttpMethod.PUT, "/plugins/*/accounts/*").hasAuthority(PermissionNames.PLUGIN_ACCOUNT_WRITE)
-                        .requestMatchers(HttpMethod.PATCH, "/plugins/*/accounts/enabled").hasAuthority(PermissionNames.PLUGIN_ACCOUNT_WRITE)
-                        .requestMatchers(HttpMethod.PATCH, "/plugins/*/accounts/*/enabled").hasAuthority(PermissionNames.PLUGIN_ACCOUNT_WRITE)
-                        .requestMatchers(HttpMethod.DELETE, "/plugins/*/accounts/*").hasAuthority(PermissionNames.PLUGIN_ACCOUNT_WRITE)
+                        .requestMatchers(HttpMethod.GET, "/plugins/installations/*/config").hasAuthority(PermissionNames.PLUGIN_CONFIG_READ)
+                        .requestMatchers(HttpMethod.PUT, "/plugins/installations/*/config").hasAuthority(PermissionNames.PLUGIN_CONFIG_WRITE)
+                        .requestMatchers(HttpMethod.GET, "/plugins/installations/*/accounts/**").hasAuthority(PermissionNames.PLUGIN_ACCOUNT_READ)
+                        .requestMatchers(HttpMethod.GET, "/plugins/installations/*/account-groups").hasAuthority(PermissionNames.PLUGIN_ACCOUNT_READ)
+                        .requestMatchers(HttpMethod.POST, "/plugins/installations/*/account-groups").hasAuthority(PermissionNames.PLUGIN_ACCOUNT_WRITE)
+                        .requestMatchers(HttpMethod.PUT, "/plugins/installations/*/account-groups/*").hasAuthority(PermissionNames.PLUGIN_ACCOUNT_WRITE)
+                        .requestMatchers(HttpMethod.DELETE, "/plugins/installations/*/account-groups/*").hasAuthority(PermissionNames.PLUGIN_ACCOUNT_WRITE)
+                        .requestMatchers(HttpMethod.PATCH, "/plugins/installations/*/accounts/group", "/plugins/installations/*/accounts/*/group").hasAuthority(PermissionNames.PLUGIN_ACCOUNT_WRITE)
+                        .requestMatchers(HttpMethod.PUT, "/plugins/installations/*/accounts/view-preference").hasAuthority(PermissionNames.PLUGIN_ACCOUNT_READ)
+                        .requestMatchers(HttpMethod.POST, "/plugins/installations/*/accounts/import").hasAuthority(PermissionNames.PLUGIN_ACCOUNT_WRITE)
+                        .requestMatchers(HttpMethod.POST, "/plugins/installations/*/accounts").hasAuthority(PermissionNames.PLUGIN_ACCOUNT_WRITE)
+                        .requestMatchers(HttpMethod.PUT, "/plugins/installations/*/accounts/*").hasAuthority(PermissionNames.PLUGIN_ACCOUNT_WRITE)
+                        .requestMatchers(HttpMethod.PATCH, "/plugins/installations/*/accounts/enabled").hasAuthority(PermissionNames.PLUGIN_ACCOUNT_WRITE)
+                        .requestMatchers(HttpMethod.PATCH, "/plugins/installations/*/accounts/*/enabled").hasAuthority(PermissionNames.PLUGIN_ACCOUNT_WRITE)
+                        .requestMatchers(HttpMethod.DELETE, "/plugins/installations/*/accounts", "/plugins/installations/*/accounts/*").hasAuthority(PermissionNames.PLUGIN_ACCOUNT_WRITE)
+                        .requestMatchers(HttpMethod.GET, "/plugins/installations/*/notification-channels")
+                        .access(allOf(
+                                hasAuthority(PermissionNames.PLUGIN_RUNTIME_MANAGE),
+                                hasAuthority(PermissionNames.PLUGIN_NOTIFICATION_CHANNEL_BIND),
+                                hasAuthority(PermissionNames.NOTIFICATION_CHANNEL_READ)))
+                        .requestMatchers(HttpMethod.PUT, "/plugins/installations/*/notification-channels")
+                        .access(allOf(
+                                hasAuthority(PermissionNames.PLUGIN_RUNTIME_MANAGE),
+                                hasAuthority(PermissionNames.PLUGIN_NOTIFICATION_CHANNEL_BIND),
+                                hasAuthority(PermissionNames.NOTIFICATION_CHANNEL_READ)))
+                        .requestMatchers(HttpMethod.POST, "/plugins/installations/*/start", "/plugins/installations/*/stop", "/plugins/installations/*/restart").hasAuthority(PermissionNames.PLUGIN_RUNTIME_MANAGE)
+                        .requestMatchers(HttpMethod.PUT, "/plugins/installations/*/debug").hasAuthority(PermissionNames.PLUGIN_RUNTIME_MANAGE)
+                        .requestMatchers(HttpMethod.DELETE, "/plugins/installations/*").hasAuthority(PermissionNames.PLUGIN_RUNTIME_MANAGE)
+                        .requestMatchers(HttpMethod.POST, "/plugins/installations").hasAuthority(PermissionNames.PLUGIN_RUNTIME_MANAGE)
+                        .requestMatchers(HttpMethod.GET, "/plugins/installations", "/plugins/installations/**").hasAuthority(PermissionNames.PLUGIN_RUNTIME_READ)
                         .requestMatchers(HttpMethod.GET, "/jobs/*/executions").hasAuthority(PermissionNames.JOB_EXECUTION_READ)
                         .requestMatchers(HttpMethod.GET, "/jobs/**").hasAuthority(PermissionNames.JOB_READ)
                         .requestMatchers(HttpMethod.POST, "/jobs/*/run").hasAuthority(PermissionNames.JOB_RUN)
                         .requestMatchers(HttpMethod.POST, "/jobs/**").hasAuthority(PermissionNames.JOB_WRITE)
+                        .requestMatchers(HttpMethod.PUT, "/jobs/*/notification-channels")
+                        .access(allOf(
+                                hasAuthority(PermissionNames.JOB_WRITE),
+                                hasAuthority(PermissionNames.JOB_NOTIFICATION_BIND),
+                                hasAuthority(PermissionNames.NOTIFICATION_CHANNEL_READ)))
                         .requestMatchers(HttpMethod.PUT, "/jobs/**").hasAuthority(PermissionNames.JOB_WRITE)
                         .requestMatchers(HttpMethod.DELETE, "/jobs/**").hasAuthority(PermissionNames.JOB_DELETE)
                         .requestMatchers(HttpMethod.POST, "/job-executions/*/cancel").hasAuthority(PermissionNames.JOB_EXECUTION_CANCEL)

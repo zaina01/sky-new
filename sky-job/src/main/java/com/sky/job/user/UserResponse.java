@@ -9,6 +9,8 @@ public record UserResponse(
         String email,
         String phone,
         String avatar,
+        Long departmentId,
+        String departmentName,
         LocalDateTime registerTime,
         Set<String> roles,
         Set<String> permissions
@@ -20,6 +22,8 @@ public record UserResponse(
                 user.email(),
                 user.phone(),
                 user.avatar(),
+                user.departmentId(),
+                user.departmentName(),
                 user.createdAt(),
                 roles,
                 permissions

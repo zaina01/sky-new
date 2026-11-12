@@ -17,11 +17,16 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 
 @Component
 public class WebhookNotificationProvider implements NotificationProvider {
+    private static final int WECHAT_TEXT_MAX_BYTES = 2048;
+    private static final int WECHAT_MAX_PARTS = 20;
+
     private final ObjectMapper objectMapper;
     private final HttpClient httpClient;
     private final DynamicNotificationSettings properties;
@@ -45,6 +50,19 @@ public class WebhookNotificationProvider implements NotificationProvider {
             throw new IllegalArgumentException("Webhook url is required");
         }
         URI.create(url);
+    }
+
+    @Override
+    public List<NotificationDeliveryPart> plan(NotificationChannel channel, NotificationSendCommand command) {
+        JsonNode config = read(channel.configJson());
+        URI uri = URI.create(text(config, "url"));
+        if (!isWechatPayload(config, uri)) {
+            return NotificationProvider.super.plan(channel, command);
+        }
+        if (utf8Bytes(renderWechatContent(command.title(), command.content())) <= WECHAT_TEXT_MAX_BYTES) {
+            return NotificationProvider.super.plan(channel, command);
+        }
+        return splitWechatText(command.title(), command.content());
     }
 
     @Override
@@ -73,10 +91,9 @@ public class WebhookNotificationProvider implements NotificationProvider {
     }
 
     private String body(JsonNode config, URI uri, NotificationSendCommand command) throws Exception {
-        String payloadType = text(config, "payloadType");
-        if (payloadType.equalsIgnoreCase("WECHAT_WORK") || payloadType.equalsIgnoreCase("WECHAT_ROBOT") || (payloadType.isBlank() && hasQueryParam(uri, "key"))) {
+        if (isWechatPayload(config, uri)) {
             Map<String, Object> text = new LinkedHashMap<>();
-            text.put("content", command.title() + "\n" + command.content());
+            text.put("content", renderWechatContent(command.title(), command.content()));
             Map<String, Object> body = new LinkedHashMap<>();
             body.put("msgtype", "text");
             body.put("text", text);
@@ -93,6 +110,131 @@ public class WebhookNotificationProvider implements NotificationProvider {
         body.put("labels", command.labels());
         body.put("createdAt", Instant.now().toString());
         return objectMapper.writeValueAsString(body);
+    }
+
+    private List<NotificationDeliveryPart> splitWechatText(String title, String content) {
+        List<String> chunks = null;
+        for (int assumedPartCount = 2; assumedPartCount <= WECHAT_MAX_PARTS; assumedPartCount++) {
+            List<String> candidate = splitContent(title, content, assumedPartCount, true);
+            if (candidate.size() <= assumedPartCount) {
+                chunks = candidate;
+                break;
+            }
+        }
+        if (chunks == null) {
+            List<String> hardSplit = splitContent(title, content, WECHAT_MAX_PARTS, false);
+            if (hardSplit.size() <= WECHAT_MAX_PARTS) {
+                chunks = hardSplit;
+            }
+        }
+        if (chunks == null) {
+            throw new IllegalArgumentException("WeChat webhook notification requires more than 20 chunks");
+        }
+
+        int partCount = chunks.size();
+        List<NotificationDeliveryPart> parts = new ArrayList<>(partCount);
+        for (int index = 0; index < partCount; index++) {
+            String partTitle = partTitle(title, index + 1, partCount);
+            String chunk = chunks.get(index);
+            if (utf8Bytes(renderWechatContent(partTitle, chunk)) > WECHAT_TEXT_MAX_BYTES) {
+                throw new IllegalStateException("WeChat webhook chunk exceeds 2048 UTF-8 bytes");
+            }
+            parts.add(new NotificationDeliveryPart(partTitle, chunk, index + 1, partCount));
+        }
+        return List.copyOf(parts);
+    }
+
+    private List<String> splitContent(String title, String content, int assumedPartCount, boolean preferNaturalBoundary) {
+        List<String> chunks = new ArrayList<>(assumedPartCount);
+        int offset = 0;
+        while (offset < content.length()) {
+            int partIndex = chunks.size() + 1;
+            String plannedTitle = partTitle(title, partIndex, assumedPartCount);
+            int byteBudget = WECHAT_TEXT_MAX_BYTES - utf8Bytes(plannedTitle + "\n");
+            if (byteBudget <= 0) {
+                throw new IllegalArgumentException("WeChat webhook title is too large to split notification content");
+            }
+            int hardEnd = endWithinUtf8Budget(content, offset, byteBudget);
+            if (hardEnd == offset) {
+                throw new IllegalArgumentException("WeChat webhook title leaves no room for notification content");
+            }
+            int end = hardEnd;
+            if (preferNaturalBoundary && hardEnd < content.length()) {
+                end = preferredBoundary(content, offset, hardEnd, byteBudget);
+            }
+            chunks.add(content.substring(offset, end));
+            offset = end;
+            if (chunks.size() > assumedPartCount) {
+                return chunks;
+            }
+        }
+        return chunks;
+    }
+
+    private int endWithinUtf8Budget(String value, int start, int byteBudget) {
+        int offset = start;
+        int usedBytes = 0;
+        while (offset < value.length()) {
+            int codePoint = value.codePointAt(offset);
+            int codePointBytes = utf8Length(codePoint);
+            if (usedBytes + codePointBytes > byteBudget) {
+                break;
+            }
+            usedBytes += codePointBytes;
+            offset += Character.charCount(codePoint);
+        }
+        return offset;
+    }
+
+    private int preferredBoundary(String value, int start, int hardEnd, int byteBudget) {
+        int cursor = hardEnd;
+        int scannedBytes = 0;
+        int maxRewindBytes = Math.max(byteBudget / 4, 1);
+        while (cursor > start) {
+            int codePoint = value.codePointBefore(cursor);
+            int codePointStart = cursor - Character.charCount(codePoint);
+            scannedBytes += utf8Length(codePoint);
+            if (scannedBytes > maxRewindBytes) {
+                break;
+            }
+            if (Character.isWhitespace(codePoint)) {
+                return cursor;
+            }
+            cursor = codePointStart;
+        }
+        return hardEnd;
+    }
+
+    private String partTitle(String title, int partIndex, int partCount) {
+        return title + " [" + partIndex + "/" + partCount + "]";
+    }
+
+    private String renderWechatContent(String title, String content) {
+        return title + "\n" + content;
+    }
+
+    private boolean isWechatPayload(JsonNode config, URI uri) {
+        String payloadType = text(config, "payloadType");
+        return payloadType.equalsIgnoreCase("WECHAT_WORK")
+                || payloadType.equalsIgnoreCase("WECHAT_ROBOT")
+                || (payloadType.isBlank() && hasQueryParam(uri, "key"));
+    }
+
+    private int utf8Bytes(String value) {
+        return value.getBytes(StandardCharsets.UTF_8).length;
+    }
+
+    private int utf8Length(int codePoint) {
+        if (codePoint <= 0x7f) {
+            return 1;
+        }
+        if (codePoint <= 0x7ff) {
+            return 2;
+        }
+        if (codePoint >= Character.MIN_SURROGATE && codePoint <= Character.MAX_SURROGATE) {
+            return 1;
+        }
+        return codePoint <= 0xffff ? 3 : 4;
     }
 
     private JsonNode read(String configJson) {

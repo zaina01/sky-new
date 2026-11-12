@@ -22,7 +22,7 @@ import io.grpc.stub.MetadataUtils;
 import java.net.InetSocketAddress;
 import java.util.concurrent.TimeUnit;
 
-class HostGrpcClient implements AutoCloseable {
+class HostGrpcClient implements AutoCloseable, NotificationHostGateway {
     private final ManagedChannel channel;
     private final PluginHostServiceGrpc.PluginHostServiceBlockingStub blockingStub;
 
@@ -94,11 +94,13 @@ class HostGrpcClient implements AutoCloseable {
         return blockingStub.listData(request);
     }
 
-    NotificationChannelListResponse listNotificationChannels(NotificationChannelListRequest request) {
+    @Override
+    public NotificationChannelListResponse listNotificationChannels(NotificationChannelListRequest request) {
         return blockingStub.listNotificationChannels(request);
     }
 
-    NotificationResponse sendNotification(NotificationRequest request) {
+    @Override
+    public NotificationResponse sendNotification(NotificationRequest request) {
         return blockingStub.sendNotification(request);
     }
 

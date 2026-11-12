@@ -4,7 +4,6 @@ import java.nio.file.Path;
 
 public record PluginUploadResult(
         String pluginId,
-        String instanceId,
         String version,
         String mainClass,
         String artifactSha256,

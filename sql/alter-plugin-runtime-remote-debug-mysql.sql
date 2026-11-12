@@ -1,3 +1,6 @@
+-- Legacy pre-upgrade patch only. Do not run this after
+-- upgrade-data-scope-plugin-installation-mysql.sql; the new
+-- plugin_installation table already contains these columns.
 USE sky_new;
 
 ALTER TABLE plugin_runtime

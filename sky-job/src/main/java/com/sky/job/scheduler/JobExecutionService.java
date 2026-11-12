@@ -84,11 +84,11 @@ public class JobExecutionService {
     }
 
     public long execute(long jobId, JobTriggerType triggerType, String overrideInputJson, Long overrideTimeoutMillis, String actor) {
-        ScheduledJob job = jobStore.findById(jobId).orElseThrow(() -> new IllegalArgumentException("Job not found"));
+        ScheduledJob job = jobStore.findByIdUnscoped(jobId).orElseThrow(() -> new IllegalArgumentException("Job not found"));
         if (triggerType == JobTriggerType.SCHEDULED && job.jobStatus() != JobStatus.ENABLED) {
             return 0;
         }
-        PluginRuntimeMetadata metadata = runtimeMetadataStore.findByPluginId(job.pluginId()).orElseThrow(() -> new IllegalArgumentException("Plugin runtime not found"));
+        PluginRuntimeMetadata metadata = runtimeMetadataStore.findByInstallationId(job.pluginInstallationId()).orElseThrow(() -> new IllegalArgumentException("Plugin installation not found"));
         boolean acquiredExecutionSlot = false;
         if (!job.concurrent()) {
             if (jobStore.markRunningIfIdle(job.id()) == 0) {
@@ -112,10 +112,10 @@ public class JobExecutionService {
         if (!metadata.capabilities().contains(com.sky.job.plugin.security.PluginCapability.TASK)) {
             throw new IllegalArgumentException("Plugin does not support task execution");
         }
-        String instanceId = metadata.instanceId() + "-job-" + job.id() + "-exec-" + System.currentTimeMillis();
+        String runId = UUID.randomUUID().toString();
+        String instanceId = metadata.instanceId() + "-job-" + job.id() + "-exec-" + runId;
         long timeoutMillis = overrideTimeoutMillis == null ? job.timeoutMillis() : overrideTimeoutMillis;
         String inputJson = overrideInputJson == null ? job.inputJson() : overrideInputJson;
-        String runId = UUID.randomUUID().toString();
         Path runnerLogPath = runtimeValidator.logFilePath(job.pluginId(), instanceId, runId);
         long executionId = executionStore.insertRunning(job, instanceId, triggerType, runnerLogPath.toString());
         LocalDateTime startedAt = LocalDateTime.now();
@@ -125,27 +125,30 @@ public class JobExecutionService {
         String requestId = "";
         try {
             PluginRuntimeSpec spec = new PluginRuntimeSpec(
+                    metadata.installationId(),
                     metadata.pluginId(),
                     instanceId,
                     metadata.mainClass(),
                     metadata.artifactPath(),
                     metadata.artifactSha256(),
-                    workDir(metadata.pluginId(), instanceId),
+                    workDir(metadata.pluginId(), metadata.installationId(), instanceId),
                     hostGrpcPort,
                     metadata.dependencyPaths(),
                     metadata.capabilities(),
                     metadata.remoteDebugEnabled(),
                     metadata.remoteDebugPort(),
                     metadata.remoteDebugSuspend(),
-                    runId
+                    runId,
+                    job.id(),
+                    executionId
             );
             handle = runtimeAdapter.start(spec);
             var request = requestFactory.create(job.pluginId(), Long.toString(job.id()), job.jobName(), timeoutMillis, inputJson);
             requestId = request.getRequestId();
             executionStore.updateRequestId(executionId, requestId);
-            active = new ActiveJobExecution(executionId, job.id(), job.jobName(), job.pluginId(), instanceId, requestId, triggerType, handle, startedAt, timeoutMillis);
+            active = new ActiveJobExecution(executionId, job.id(), job.jobName(), job.pluginInstallationId(), job.pluginId(), instanceId, requestId, triggerType, handle, startedAt, timeoutMillis);
             activeExecutionRegistry.register(active);
-            if (executionStore.findById(executionId).map(JobExecution::status).orElseThrow(() -> new IllegalArgumentException("Job execution not found")) == JobExecutionStatus.CANCELLED) {
+            if (executionStore.findByIdUnscoped(executionId).map(JobExecution::status).orElseThrow(() -> new IllegalArgumentException("Job execution not found")) == JobExecutionStatus.CANCELLED) {
                 return executionId;
             }
             TaskRunResponse response = taskInvoker.invoke(handle, request, Duration.ofMillis(timeoutMillis));
@@ -191,7 +194,7 @@ public class JobExecutionService {
     }
 
     public JobExecution cancel(long executionId, String actor) {
-        JobExecution execution = executionStore.findById(executionId).orElseThrow(() -> new IllegalArgumentException("Job execution not found"));
+        JobExecution execution = executionStore.findByIdUnscoped(executionId).orElseThrow(() -> new IllegalArgumentException("Job execution not found"));
         if (execution.status() == JobExecutionStatus.CANCELLED) {
             return execution;
         }
@@ -200,7 +203,7 @@ public class JobExecutionService {
         }
         LocalDateTime finishedAt = LocalDateTime.now();
         if (executionStore.markCancelledIfRunning(executionId, "Job execution cancelled", "USER_CANCELLED", execution.startedAt(), finishedAt) == 0) {
-            JobExecution current = executionStore.findById(executionId).orElseThrow(() -> new IllegalArgumentException("Job execution not found"));
+            JobExecution current = executionStore.findByIdUnscoped(executionId).orElseThrow(() -> new IllegalArgumentException("Job execution not found"));
             if (current.status() == JobExecutionStatus.CANCELLED) {
                 return current;
             }
@@ -233,7 +236,7 @@ public class JobExecutionService {
 
         auditExecutionCancel(execution, active, actor, finishedAt, runnerCancelAttempted, runnerCancelAccepted, runtimeStopAttempted, runnerCancelErrorType, runnerCancelStatusCode);
         sendCancelAlert(execution, active, runnerCancelErrorType, finishedAt);
-        return executionStore.findById(executionId).orElseThrow(() -> new IllegalArgumentException("Job execution not found"));
+        return executionStore.findByIdUnscoped(executionId).orElseThrow(() -> new IllegalArgumentException("Job execution not found"));
     }
 
     private boolean stopRuntime(ActiveJobExecution active) {
@@ -263,7 +266,10 @@ public class JobExecutionService {
                 + ", durationMillis=" + Duration.between(startedAt, finishedAt).toMillis()
                 + ", errorType=" + nullToEmpty(errorType)
                 + ", errorMessage=" + nullToEmpty(errorMessage);
-        notificationService.sendHostAlert(new HostNotificationEvent(eventType, "Job execution " + status.name(), content, status.name(), executionId, job.pluginId(), instanceId, Long.toString(job.id()), labels));
+        notificationService.sendHostAlert(new HostNotificationEvent(
+                eventType, "Job execution " + status.name(), content, status.name(), executionId,
+                job.pluginInstallationId(), job.pluginId(), instanceId, Long.toString(job.id()),
+                job.ownerUserId(), job.ownerDepartmentId(), labels));
     }
 
     private void sendCancelAlert(JobExecution execution, ActiveJobExecution active, String errorType, LocalDateTime finishedAt) {
@@ -280,11 +286,16 @@ public class JobExecutionService {
                 + ", executionId=" + execution.id()
                 + ", durationMillis=" + Duration.between(execution.startedAt(), finishedAt).toMillis()
                 + ", errorType=" + nullToEmpty(errorType);
-        notificationService.sendHostAlert(new HostNotificationEvent(NotificationEventType.JOB_EXECUTION_CANCELLED, "Job execution CANCELLED", content, "CANCELLED", execution.id(), execution.pluginId(), active == null ? execution.instanceId() : active.instanceId(), Long.toString(execution.jobId()), labels));
+        notificationService.sendHostAlert(new HostNotificationEvent(
+                NotificationEventType.JOB_EXECUTION_CANCELLED, "Job execution CANCELLED", content, "CANCELLED",
+                execution.id(), execution.pluginInstallationId(), execution.pluginId(),
+                active == null ? execution.instanceId() : active.instanceId(), Long.toString(execution.jobId()),
+                execution.ownerUserId(), execution.ownerDepartmentId(), labels));
     }
 
     private NotificationEventType terminalEventType(JobExecutionStatus status) {
         return switch (status) {
+            case SUCCESS -> NotificationEventType.JOB_EXECUTION_SUCCESS;
             case FAILED -> NotificationEventType.JOB_EXECUTION_FAILED;
             case TIMEOUT -> NotificationEventType.JOB_EXECUTION_TIMEOUT;
             default -> null;
@@ -294,7 +305,7 @@ public class JobExecutionService {
     private void auditExecutionStart(ScheduledJob job, long executionId, String instanceId, JobTriggerType triggerType, String actor, long timeoutMillis, String inputJson) {
         Map<String, Object> detail = baseExecutionDetail("start", job, executionId, instanceId, triggerType, timeoutMillis, inputJson);
         detail.put("status", JobExecutionStatus.RUNNING.name());
-        audit(job.pluginId(), instanceId, actor, "PLUGIN_TASK_EXECUTION_START", detail);
+        audit(job.pluginInstallationId(), job.pluginId(), instanceId, actor, "PLUGIN_TASK_EXECUTION_START", detail);
     }
 
     private void auditExecutionFinish(
@@ -319,7 +330,7 @@ public class JobExecutionService {
         detail.put("resultPresent", hasPayload(resultJson));
         detail.put("resultBytes", utf8Bytes(resultJson));
         detail.put("errorType", errorType == null ? "" : errorType);
-        audit(job.pluginId(), instanceId, actor, "PLUGIN_TASK_EXECUTION_FINISH", detail);
+        audit(job.pluginInstallationId(), job.pluginId(), instanceId, actor, "PLUGIN_TASK_EXECUTION_FINISH", detail);
     }
 
     private void auditExecutionCancel(
@@ -339,6 +350,7 @@ public class JobExecutionService {
         detail.put("jobId", execution.jobId());
         detail.put("jobName", execution.jobName());
         detail.put("pluginId", execution.pluginId());
+        detail.put("pluginInstallationId", execution.pluginInstallationId());
         detail.put("instanceId", active == null ? execution.instanceId() : active.instanceId());
         detail.put("requestId", active == null ? nullToEmpty(execution.requestId()) : nullToEmpty(active.requestId()));
         detail.put("triggerType", execution.triggerType().name());
@@ -350,7 +362,7 @@ public class JobExecutionService {
         detail.put("durationMillis", Duration.between(execution.startedAt(), finishedAt).toMillis());
         detail.put("runnerCancelErrorType", nullToEmpty(runnerCancelErrorType));
         detail.put("runnerCancelStatusCode", nullToEmpty(runnerCancelStatusCode));
-        audit(execution.pluginId(), active == null ? execution.instanceId() : active.instanceId(), actor, "PLUGIN_TASK_EXECUTION_CANCEL", detail);
+        audit(execution.pluginInstallationId(), execution.pluginId(), active == null ? execution.instanceId() : active.instanceId(), actor, "PLUGIN_TASK_EXECUTION_CANCEL", detail);
     }
 
     private Map<String, Object> baseExecutionDetail(String operation, ScheduledJob job, long executionId, String instanceId, JobTriggerType triggerType, long timeoutMillis, String inputJson) {
@@ -360,6 +372,7 @@ public class JobExecutionService {
         detail.put("jobId", job.id());
         detail.put("jobName", job.jobName());
         detail.put("pluginId", job.pluginId());
+        detail.put("pluginInstallationId", job.pluginInstallationId());
         detail.put("instanceId", instanceId);
         detail.put("triggerType", triggerType.name());
         detail.put("timeoutMillis", timeoutMillis);
@@ -368,9 +381,9 @@ public class JobExecutionService {
         return detail;
     }
 
-    private void audit(String pluginId, String instanceId, String actor, String action, Map<String, Object> detail) {
+    private void audit(String installationId, String pluginId, String instanceId, String actor, String action, Map<String, Object> detail) {
         try {
-            auditStore.insert(pluginId, instanceId, actor(actor), action, objectMapper.writeValueAsString(detail));
+            auditStore.insert(installationId, pluginId, instanceId, actor(actor), action, objectMapper.writeValueAsString(detail));
         } catch (JsonProcessingException exception) {
             log.warn("Failed to serialize plugin task execution audit detail: pluginId={}, instanceId={}, action={}", pluginId, instanceId, action, exception);
         } catch (RuntimeException exception) {
@@ -403,7 +416,7 @@ public class JobExecutionService {
         };
     }
 
-    private Path workDir(String pluginId, String instanceId) {
-        return runtimeProperties.workRoot().resolve(pluginId).resolve(instanceId);
+    private Path workDir(String pluginId, String installationId, String instanceId) {
+        return runtimeProperties.workRoot().resolve(pluginId).resolve(installationId).resolve(instanceId);
     }
 }

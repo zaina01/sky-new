@@ -5,6 +5,7 @@ import com.sky.job.plugin.runtime.PluginRuntimeHandle;
 import java.nio.file.Path;
 
 public record ProcessPluginRuntimeHandle(
+        String installationId,
         String pluginId,
         String instanceId,
         int port,

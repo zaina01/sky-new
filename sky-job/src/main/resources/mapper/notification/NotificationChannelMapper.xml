@@ -1,7 +1,5 @@
 <?xml version="1.0" encoding="UTF-8" ?>
-<!DOCTYPE mapper
-        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
-        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="com.sky.job.notification.mapper.NotificationChannelMapper">
     <resultMap id="NotificationChannelRowResultMap" type="com.sky.job.notification.mapper.NotificationChannelRow">
         <constructor>
@@ -12,6 +10,10 @@
             <arg column="enabled" javaType="_boolean"/>
             <arg column="config_json" javaType="java.lang.String"/>
             <arg column="remark" javaType="java.lang.String"/>
+            <arg column="owner_user_id" javaType="java.lang.String"/>
+            <arg column="owner_username" javaType="java.lang.String"/>
+            <arg column="owner_department_id" javaType="java.lang.Long"/>
+            <arg column="owner_department_name" javaType="java.lang.String"/>
             <arg column="created_by" javaType="java.lang.String"/>
             <arg column="updated_by" javaType="java.lang.String"/>
             <arg column="created_at" javaType="java.time.LocalDateTime"/>
@@ -19,74 +21,91 @@
         </constructor>
     </resultMap>
 
+    <sql id="columns">
+        c.id, c.channel_id, c.channel_type, c.display_name, c.enabled, c.config_json, c.remark,
+        c.owner_user_id, u.username AS owner_username, c.owner_dept_id AS owner_department_id,
+        d.department_name AS owner_department_name, c.created_by, c.updated_by, c.created_at, c.updated_at
+    </sql>
+    <sql id="joins">
+        FROM notification_channel c
+        LEFT JOIN sky_user u ON u.user_id=c.owner_user_id
+        JOIN sky_department d ON d.department_id=c.owner_dept_id
+    </sql>
+    <sql id="scope">
+        <if test="scope != null and !scope.all">
+            AND <choose>
+                <when test="scope.denied">1=0</when>
+                <otherwise>(
+                    <if test="scope.departmentIds != null and !scope.departmentIds.isEmpty()">
+                        c.owner_dept_id IN <foreach collection="scope.departmentIds" item="deptId" open="(" separator="," close=")">#{deptId}</foreach>
+                    </if>
+                    <if test="scope.self">
+                        <if test="scope.departmentIds != null and !scope.departmentIds.isEmpty()"> OR </if>
+                        c.owner_user_id=#{scope.userId}
+                    </if>
+                )</otherwise>
+            </choose>
+        </if>
+    </sql>
     <sql id="filters">
-        <where>
-            <if test="channelType != null">
-                channel_type = #{channelType}
-            </if>
-            <if test="enabled != null">
-                AND enabled = #{enabled}
-            </if>
-            <if test="channelId != null and channelId != ''">
-                AND channel_id = #{channelId}
-            </if>
-            <if test="displayName != null and displayName != ''">
-                AND display_name LIKE #{displayNameLike}
-            </if>
-        </where>
+        <if test="channelType != null">AND c.channel_type=#{channelType}</if>
+        <if test="enabled != null">AND c.enabled=#{enabled}</if>
+        <if test="channelId != null and channelId != ''">AND c.channel_id=#{channelId}</if>
+        <if test="displayName != null and displayName != ''">AND c.display_name LIKE #{displayNameLike}</if>
+        <include refid="scope"/>
     </sql>
 
     <select id="list" resultMap="NotificationChannelRowResultMap">
-        SELECT *
-        FROM notification_channel
-        <include refid="filters"/>
-        ORDER BY id DESC
-        LIMIT #{limit} OFFSET #{offset}
+        SELECT <include refid="columns"/> <include refid="joins"/>
+        <where><include refid="filters"/></where> ORDER BY c.id DESC LIMIT #{limit} OFFSET #{offset}
     </select>
-
     <select id="count" resultType="long">
-        SELECT COUNT(*)
-        FROM notification_channel
-        <include refid="filters"/>
+        SELECT COUNT(*) <include refid="joins"/> <where><include refid="filters"/></where>
     </select>
-
     <select id="findByChannelId" resultMap="NotificationChannelRowResultMap">
-        SELECT * FROM notification_channel WHERE channel_id = #{channelId}
+        SELECT <include refid="columns"/> <include refid="joins"/>
+        <where>c.channel_id=#{channelId}<include refid="scope"/></where>
+    </select>
+    <select id="findByChannelIdUnscoped" resultMap="NotificationChannelRowResultMap">
+        SELECT <include refid="columns"/> <include refid="joins"/> WHERE c.channel_id=#{channelId}
     </select>
 
     <insert id="insert">
-        INSERT INTO notification_channel (channel_id, channel_type, display_name, enabled, config_json, remark, created_by, updated_by)
-        VALUES (#{channelId}, #{channelType}, #{displayName}, #{enabled}, CAST(#{configJson} AS JSON), #{remark}, #{createdBy}, #{createdBy})
+        INSERT INTO notification_channel (
+            channel_id, channel_type, display_name, enabled, config_json, remark,
+            owner_user_id, owner_dept_id, created_by, updated_by
+        ) VALUES (
+            #{channelId}, #{channelType}, #{displayName}, #{enabled}, CAST(#{configJson} AS JSON), #{remark},
+            #{ownerUserId}, #{ownerDepartmentId}, #{createdBy}, #{createdBy}
+        )
     </insert>
-
     <update id="update">
-        UPDATE notification_channel
-        SET channel_type = #{channelType}, display_name = #{displayName}, enabled = #{enabled}, config_json = CAST(#{configJson} AS JSON), remark = #{remark}, updated_by = #{updatedBy}, updated_at = CURRENT_TIMESTAMP
-        WHERE channel_id = #{channelId}
+        UPDATE notification_channel SET channel_type=#{channelType}, display_name=#{displayName}, enabled=#{enabled},
+            config_json=CAST(#{configJson} AS JSON), remark=#{remark}, updated_by=#{updatedBy}, updated_at=CURRENT_TIMESTAMP
+        WHERE channel_id=#{channelId}
     </update>
-
     <update id="updateEnabled">
-        UPDATE notification_channel
-        SET enabled = #{enabled}, updated_by = #{updatedBy}, updated_at = CURRENT_TIMESTAMP
-        WHERE channel_id = #{channelId}
+        UPDATE notification_channel SET enabled=#{enabled}, updated_by=#{updatedBy}, updated_at=CURRENT_TIMESTAMP
+        WHERE channel_id=#{channelId}
     </update>
+    <delete id="delete">DELETE FROM notification_channel WHERE channel_id=#{channelId}</delete>
 
-    <delete id="delete">DELETE FROM notification_channel WHERE channel_id = #{channelId}</delete>
-
-    <select id="listEnabled" resultMap="NotificationChannelRowResultMap">
-        SELECT *
-        FROM notification_channel
-        WHERE enabled = TRUE
-        ORDER BY channel_id
+    <select id="listEnabledUnscoped" resultMap="NotificationChannelRowResultMap">
+        SELECT <include refid="columns"/> <include refid="joins"/> WHERE c.enabled=TRUE ORDER BY c.channel_id
     </select>
-
-    <select id="listEnabledByIds" resultMap="NotificationChannelRowResultMap">
-        SELECT *
-        FROM notification_channel
-        WHERE enabled = TRUE AND channel_id IN
-        <foreach collection="channelIds" item="channelId" open="(" separator="," close=")">
-            #{channelId}
-        </foreach>
-        ORDER BY channel_id
+    <select id="listByIdsUnscoped" resultMap="NotificationChannelRowResultMap">
+        SELECT <include refid="columns"/> <include refid="joins"/>
+        WHERE c.channel_id IN <foreach collection="channelIds" item="channelId" open="(" separator="," close=")">#{channelId}</foreach>
+        ORDER BY c.channel_id
     </select>
+    <select id="countBindings" resultType="int">
+        SELECT
+            (SELECT COUNT(*) FROM plugin_installation_channel WHERE channel_id=#{channelId})
+          + (SELECT COUNT(*) FROM job_notification_channel WHERE channel_id=#{channelId})
+          + (SELECT COUNT(*) FROM notification_rule_channel WHERE channel_id=#{channelId})
+    </select>
+    <update id="transferOwnership">
+        UPDATE notification_channel SET owner_user_id=#{ownerUserId}, owner_dept_id=#{ownerDepartmentId},
+            updated_by=#{updatedBy}, updated_at=CURRENT_TIMESTAMP WHERE channel_id=#{channelId}
+    </update>
 </mapper>

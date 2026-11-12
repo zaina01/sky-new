@@ -4,8 +4,10 @@ import java.time.LocalDateTime;
 
 public record PluginRuntimeRecord(
         long id,
+        String installationId,
         String pluginId,
         String instanceId,
+        String installationName,
         String version,
         String displayName,
         String mainClass,
@@ -23,6 +25,10 @@ public record PluginRuntimeRecord(
         boolean remoteDebugEnabled,
         int remoteDebugPort,
         boolean remoteDebugSuspend,
+        String ownerUserId,
+        String ownerUsername,
+        Long ownerDepartmentId,
+        String ownerDepartmentName,
         LocalDateTime startedAt,
         LocalDateTime createdAt,
         LocalDateTime updatedAt

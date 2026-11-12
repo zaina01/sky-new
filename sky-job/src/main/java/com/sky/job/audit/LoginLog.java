@@ -5,6 +5,7 @@ import java.time.LocalDateTime;
 public record LoginLog(
         Long id,
         String userId,
+        Long ownerDepartmentId,
         String username,
         String status,
         LocalDateTime loginTime,

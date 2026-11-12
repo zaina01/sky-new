@@ -17,7 +17,7 @@ import org.springframework.web.bind.annotation.RestController;
 import java.util.List;
 
 @RestController
-@RequestMapping("/plugins/{pluginId}/dependencies")
+@RequestMapping("/plugins/definitions/{pluginId}/dependencies")
 public class PluginDependencyController {
     private final PluginDependencyManagementService service;
 

@@ -2,6 +2,8 @@ package com.sky.job.plugin.runtime;
 
 import com.sky.job.plugin.runtime.dto.PluginOptionResponse;
 import com.sky.job.scheduler.dto.PageResponse;
+import com.sky.job.security.AuthenticatedUser;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -22,8 +24,9 @@ public class PluginOptionController {
             @RequestParam(required = false) Integer size,
             @RequestParam(required = false) String keyword,
             @RequestParam(required = false) PluginRuntimeState state,
-            @RequestParam(required = false) PluginOptionUsage usage
+            @RequestParam(required = false) PluginOptionUsage usage,
+            @AuthenticationPrincipal AuthenticatedUser user
     ) {
-        return runtimeService.options(page, size, keyword, state, usage);
+        return runtimeService.options(page, size, keyword, state, usage, user);
     }
 }

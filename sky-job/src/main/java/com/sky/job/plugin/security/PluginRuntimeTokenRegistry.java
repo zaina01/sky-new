@@ -17,14 +17,25 @@ public class PluginRuntimeTokenRegistry {
     private final SecureRandom secureRandom = new SecureRandom();
     private final Map<String, PluginRuntimeTokenRecord> records = new ConcurrentHashMap<>();
 
-    public String register(String pluginId, String instanceId, Set<PluginCapability> capabilities, Duration ttl) {
+    public String register(
+            String installationId,
+            String pluginId,
+            String instanceId,
+            Long jobId,
+            Long executionId,
+            Set<PluginCapability> capabilities,
+            Duration ttl
+    ) {
         byte[] tokenBytes = new byte[32];
         secureRandom.nextBytes(tokenBytes);
         String token = Base64.getUrlEncoder().withoutPadding().encodeToString(tokenBytes);
         Instant issuedAt = Instant.now();
         records.put(key(pluginId, instanceId), new PluginRuntimeTokenRecord(
+                installationId,
                 pluginId,
                 instanceId,
+                jobId,
+                executionId,
                 digest(token),
                 Set.copyOf(capabilities),
                 issuedAt,

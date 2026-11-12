@@ -2,6 +2,7 @@ package com.sky.job.system;
 
 import com.sky.job.scheduler.dto.PageResponse;
 import com.sky.job.system.dto.ReplaceRolePermissionsRequest;
+import com.sky.job.system.dto.ReplaceRoleDataScopeRequest;
 import com.sky.job.system.dto.RoleResponse;
 import com.sky.job.system.dto.UpsertRoleRequest;
 import jakarta.servlet.http.HttpServletRequest;
@@ -53,6 +54,11 @@ public class SystemRoleController {
     @PutMapping("/{roleId}/permissions")
     public RoleResponse replacePermissions(@PathVariable Long roleId, @RequestBody ReplaceRolePermissionsRequest request, HttpServletRequest httpRequest) {
         return roleService.replacePermissions(roleId, request, httpRequest);
+    }
+
+    @PutMapping("/{roleId}/data-scope")
+    public RoleResponse replaceDataScope(@PathVariable Long roleId, @RequestBody ReplaceRoleDataScopeRequest request, HttpServletRequest httpRequest) {
+        return roleService.replaceDataScope(roleId, request, httpRequest);
     }
 
     @DeleteMapping("/{roleId}")

@@ -11,7 +11,6 @@ import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.UUID;
 
 @Repository
 public class PluginArtifactRegistry {
@@ -23,11 +22,9 @@ public class PluginArtifactRegistry {
         this.objectMapper = objectMapper;
     }
 
-    public String register(PluginUploadManifest manifest, Set<PluginCapability> capabilities, Path artifactPath, String sha256, List<ResolvedPluginDependency> dependencies, boolean overwriteDependencies) {
-        String instanceId = manifest.pluginId() + "-" + UUID.randomUUID();
-        mapper.upsertRuntime(
+    public String register(PluginUploadManifest manifest, Set<PluginCapability> capabilities, Path artifactPath, String sha256, List<ResolvedPluginDependency> dependencies, boolean overwriteDependencies, String uploadedBy) {
+        mapper.upsertDefinition(
                 manifest.pluginId(),
-                instanceId,
                 manifest.version(),
                 manifest.displayName() == null ? "" : manifest.displayName(),
                 manifest.runtime().mainClass(),
@@ -43,15 +40,40 @@ public class PluginArtifactRegistry {
                 jsonNode(manifest.configSchema()),
                 jsonNode(manifest.accountSchema()),
                 json(dependencies == null ? List.of() : dependencies),
-                overwriteDependencies
+                overwriteDependencies,
+                uploadedBy == null ? "" : uploadedBy
         );
-        return instanceId;
+        return manifest.pluginId();
+    }
+
+    public java.util.Optional<PluginDefinition> find(String pluginId) {
+        return java.util.Optional.ofNullable(mapper.findDefinition(pluginId));
+    }
+
+    public java.util.List<PluginDefinition> list(String keyword, Integer page, Integer size) {
+        int p = Math.max(page == null ? 1 : page, 1);
+        int s = Math.min(Math.max(size == null ? 20 : size, 1), 100);
+        String normalized = keyword == null || keyword.isBlank() ? null : keyword.trim();
+        return mapper.listDefinitions(normalized, normalized == null ? null : "%" + normalized + "%", s, (p - 1) * s);
+    }
+
+    public long count(String keyword) {
+        String normalized = keyword == null || keyword.isBlank() ? null : keyword.trim();
+        return mapper.countDefinitions(normalized, normalized == null ? null : "%" + normalized + "%");
+    }
+
+    public boolean hasInstallations(String pluginId) {
+        return mapper.countInstallations(pluginId) > 0;
+    }
+
+    public int delete(String pluginId) {
+        return mapper.deleteDefinition(pluginId);
     }
 
     public void updateDependencies(String pluginId, List<ResolvedPluginDependency> dependencies) {
         int updated = mapper.updateDependencyJars(pluginId, json(dependencies == null ? List.of() : dependencies));
         if (updated == 0) {
-            throw new IllegalArgumentException("Plugin runtime not found");
+            throw new IllegalArgumentException("Plugin definition not found");
         }
     }
 

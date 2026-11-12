@@ -11,6 +11,9 @@
             <arg column="email" javaType="java.lang.String"/>
             <arg column="phone" javaType="java.lang.String"/>
             <arg column="avatar" javaType="java.lang.String"/>
+            <arg column="department_id" javaType="java.lang.Long"/>
+            <arg column="department_name" javaType="java.lang.String"/>
+            <arg column="department_enabled" javaType="_boolean"/>
             <arg column="enabled" javaType="_boolean"/>
             <arg column="created_at" javaType="java.time.LocalDateTime"/>
             <arg column="updated_at" javaType="java.time.LocalDateTime"/>
@@ -24,37 +27,74 @@
     <select id="countByEmailForOtherUser" resultType="int">SELECT COUNT(*) FROM sky_user WHERE email = #{email} AND user_id &lt;&gt; #{userId}</select>
     <select id="countByPhoneForOtherUser" resultType="int">SELECT COUNT(*) FROM sky_user WHERE phone = #{phone} AND user_id &lt;&gt; #{userId}</select>
 
-    <select id="findByUsername" resultMap="UserResultMap">SELECT * FROM sky_user WHERE username = #{username}</select>
-    <select id="findByUserId" resultMap="UserResultMap">SELECT * FROM sky_user WHERE user_id = #{userId}</select>
+    <sql id="userColumns">
+        u.*, d.department_name, d.enabled AS department_enabled
+    </sql>
+
+    <select id="findByUsername" resultMap="UserResultMap">
+        SELECT <include refid="userColumns"/> FROM sky_user u JOIN sky_department d ON d.department_id = u.department_id WHERE u.username = #{username}
+    </select>
+    <select id="findByUserId" resultMap="UserResultMap">
+        SELECT <include refid="userColumns"/> FROM sky_user u JOIN sky_department d ON d.department_id = u.department_id WHERE u.user_id = #{userId}
+    </select>
 
     <sql id="filters">
-        <where>
-            <if test="username != null and username != ''">
-                username LIKE #{usernameLike}
-            </if>
-            <if test="enabled != null">
-                AND enabled = #{enabled}
-            </if>
-        </where>
+        <if test="username != null and username != ''">
+            AND u.username LIKE #{usernameLike}
+        </if>
+        <if test="enabled != null">
+            AND u.enabled = #{enabled}
+        </if>
+        <if test="departmentFilterIds != null and !departmentFilterIds.isEmpty()">
+            AND u.department_id IN
+            <foreach collection="departmentFilterIds" item="departmentId" open="(" separator="," close=")">#{departmentId}</foreach>
+        </if>
+    </sql>
+
+    <sql id="dataScope">
+        <if test="scope != null and !scope.all">
+            AND
+            <choose>
+                <when test="scope.denied">1 = 0</when>
+                <otherwise>
+                    (
+                    <if test="scope.departmentIds != null and !scope.departmentIds.isEmpty()">
+                        u.department_id IN
+                        <foreach collection="scope.departmentIds" item="scopeDepartmentId" open="(" separator="," close=")">#{scopeDepartmentId}</foreach>
+                    </if>
+                    <if test="scope.self">
+                        <if test="scope.departmentIds != null and !scope.departmentIds.isEmpty()"> OR </if>
+                        u.user_id = #{scope.userId}
+                    </if>
+                    )
+                </otherwise>
+            </choose>
+        </if>
     </sql>
 
     <select id="list" resultMap="UserResultMap">
-        SELECT *
-        FROM sky_user
-        <include refid="filters"/>
-        ORDER BY created_at DESC
+        SELECT <include refid="userColumns"/>
+        FROM sky_user u JOIN sky_department d ON d.department_id = u.department_id
+        <where>
+            <include refid="filters"/>
+            <include refid="dataScope"/>
+        </where>
+        ORDER BY u.created_at DESC
         LIMIT #{limit} OFFSET #{offset}
     </select>
 
     <select id="count" resultType="long">
         SELECT COUNT(*)
-        FROM sky_user
-        <include refid="filters"/>
+        FROM sky_user u
+        <where>
+            <include refid="filters"/>
+            <include refid="dataScope"/>
+        </where>
     </select>
 
     <insert id="insert">
-        INSERT INTO sky_user (user_id, username, password_hash, email, phone, avatar, enabled)
-        VALUES (#{userId}, #{username}, #{passwordHash}, #{email}, #{phone}, #{avatar}, #{enabled})
+        INSERT INTO sky_user (user_id, username, password_hash, email, phone, avatar, department_id, enabled)
+        VALUES (#{userId}, #{username}, #{passwordHash}, #{email}, #{phone}, #{avatar}, #{departmentId}, #{enabled})
     </insert>
 
     <update id="updatePassword">
@@ -63,7 +103,7 @@
 
     <update id="updateProfile">
         UPDATE sky_user
-        SET email = #{email}, phone = #{phone}, avatar = #{avatar}, enabled = #{enabled}, updated_at = CURRENT_TIMESTAMP
+        SET email = #{email}, phone = #{phone}, avatar = #{avatar}, department_id = #{departmentId}, enabled = #{enabled}, updated_at = CURRENT_TIMESTAMP
         WHERE user_id = #{userId}
     </update>
 
@@ -107,5 +147,13 @@
         JOIN sky_role_permission rp ON rp.permission_id = p.permission_id
         JOIN sky_user_role ur ON ur.role_id = rp.role_id
         WHERE ur.user_id = #{userId}
+    </select>
+
+    <select id="countOwnedResources" resultType="int">
+        SELECT
+            (SELECT COUNT(*) FROM plugin_installation WHERE owner_user_id = #{userId} AND deleted = FALSE)
+          + (SELECT COUNT(*) FROM job WHERE owner_user_id = #{userId})
+          + (SELECT COUNT(*) FROM notification_channel WHERE owner_user_id = #{userId})
+          + (SELECT COUNT(*) FROM notification_rule WHERE owner_user_id = #{userId})
     </select>
 </mapper>

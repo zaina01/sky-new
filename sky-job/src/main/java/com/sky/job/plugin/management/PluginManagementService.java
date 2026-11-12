@@ -4,27 +4,43 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import com.sky.job.plugin.management.dto.BatchDeletePluginAccountRequest;
+import com.sky.job.plugin.management.dto.BatchDeletePluginAccountResponse;
+import com.sky.job.plugin.management.dto.BatchPluginAccountDeleteReceipt;
 import com.sky.job.plugin.management.dto.BatchPluginAccountStateReceipt;
 import com.sky.job.plugin.management.dto.BatchUpdatePluginAccountStateRequest;
 import com.sky.job.plugin.management.dto.BatchUpdatePluginAccountStateResponse;
 import com.sky.job.plugin.management.dto.PluginAccountExportFile;
 import com.sky.job.plugin.management.dto.PluginAccountImportResponse;
 import com.sky.job.plugin.management.dto.PluginAccountImportRowResult;
+import com.sky.job.plugin.management.dto.PluginAccountListItemResponse;
 import com.sky.job.plugin.management.dto.PluginAccountResponse;
 import com.sky.job.plugin.management.dto.PluginAccountSchemaResponse;
+import com.sky.job.plugin.management.dto.PluginAccountViewPreferenceResponse;
 import com.sky.job.plugin.management.dto.PluginConfigResponse;
 import com.sky.job.plugin.management.dto.UpdatePluginAccountStateRequest;
+import com.sky.job.plugin.management.dto.UpdatePluginAccountViewPreferenceRequest;
 import com.sky.job.plugin.management.dto.UpdatePluginConfigRequest;
 import com.sky.job.plugin.management.dto.UpsertPluginAccountRequest;
 import com.sky.job.plugin.runtime.PluginRuntimeRecord;
 import com.sky.job.plugin.security.PluginCapability;
 import com.sky.job.plugin.storage.PluginAccount;
+import com.sky.job.plugin.storage.PluginAccountGroup;
+import com.sky.job.plugin.storage.PluginAccountGroupStore;
+import com.sky.job.plugin.management.dto.UpsertPluginAccountGroupRequest;
+import com.sky.job.plugin.management.dto.UpdatePluginAccountGroupRequest;
+import com.sky.job.plugin.management.dto.BatchUpdatePluginAccountGroupResponse;
+import com.sky.job.plugin.management.dto.BatchPluginAccountGroupReceipt;
 import com.sky.job.plugin.storage.PluginAccountStore;
 import com.sky.job.plugin.storage.PluginAuditStore;
 import com.sky.job.plugin.storage.PluginConfigStore;
 import com.sky.job.plugin.storage.PluginPayloadValidator;
 import com.sky.job.scheduler.PluginRuntimeMetadataStore;
 import com.sky.job.scheduler.dto.PageResponse;
+import com.sky.job.security.AuthenticatedUser;
+import com.sky.job.security.DataScopeService;
+import com.sky.job.security.PermissionNames;
+import com.sky.job.web.ResourceNotFoundException;
 import org.apache.commons.csv.CSVFormat;
 import org.apache.commons.csv.CSVParser;
 import org.apache.commons.csv.CSVPrinter;
@@ -37,6 +53,8 @@ import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
+import org.springframework.dao.DuplicateKeyException;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.ByteArrayOutputStream;
@@ -69,6 +87,9 @@ public class PluginManagementService {
     private final PluginPayloadValidator payloadValidator;
     private final PluginAuditStore auditStore;
     private final ObjectMapper objectMapper;
+    private final DataScopeService dataScopeService;
+    private final PluginAccountListViewService accountListViewService;
+    private final PluginAccountGroupStore accountGroupStore;
 
     public PluginManagementService(
             PluginRuntimeMetadataStore runtimeStore,
@@ -76,7 +97,10 @@ public class PluginManagementService {
             PluginAccountStore accountStore,
             PluginPayloadValidator payloadValidator,
             PluginAuditStore auditStore,
-            ObjectMapper objectMapper
+            ObjectMapper objectMapper,
+            DataScopeService dataScopeService,
+            PluginAccountListViewService accountListViewService,
+            PluginAccountGroupStore accountGroupStore
     ) {
         this.runtimeStore = runtimeStore;
         this.configStore = configStore;
@@ -84,37 +108,69 @@ public class PluginManagementService {
         this.payloadValidator = payloadValidator;
         this.auditStore = auditStore;
         this.objectMapper = objectMapper;
+        this.dataScopeService = dataScopeService;
+        this.accountListViewService = accountListViewService;
+        this.accountGroupStore = accountGroupStore;
     }
 
-    public PluginConfigResponse getConfig(String pluginId) {
-        PluginRuntimeRecord runtime = requireCapability(pluginId, PluginCapability.CONFIG);
-        return new PluginConfigResponse(pluginId, configStore.getConfigJson(pluginId), schema(runtime.configSchemaJson()));
+    public PluginConfigResponse getConfig(String installationId, AuthenticatedUser user) {
+        PluginRuntimeRecord runtime = requireCapability(installationId, PluginCapability.CONFIG, user, PermissionNames.PLUGIN_CONFIG_READ);
+        return new PluginConfigResponse(installationId, runtime.pluginId(), configStore.getConfigJson(installationId), schema(runtime.configSchemaJson()));
     }
 
-    public PluginConfigResponse updateConfig(String pluginId, UpdatePluginConfigRequest request, String actor) {
-        PluginRuntimeRecord runtime = requireCapability(pluginId, PluginCapability.CONFIG);
+    public PluginConfigResponse updateConfig(String installationId, UpdatePluginConfigRequest request, AuthenticatedUser user) {
+        PluginRuntimeRecord runtime = requireCapability(installationId, PluginCapability.CONFIG, user, PermissionNames.PLUGIN_CONFIG_WRITE);
         String configJson = payloadValidator.normalizeConfigJson(request == null ? null : request.configJson());
-        configStore.upsertConfigJson(pluginId, configJson);
-        audit(pluginId, "", actor, "PLUGIN_CONFIG_UPDATE", configDetail(configJson));
-        return new PluginConfigResponse(pluginId, configJson, schema(runtime.configSchemaJson()));
+        configStore.upsertConfigJson(installationId, configJson);
+        audit(runtime, user.username(), "PLUGIN_CONFIG_UPDATE", configDetail(configJson));
+        return new PluginConfigResponse(installationId, runtime.pluginId(), configJson, schema(runtime.configSchemaJson()));
     }
 
-    public PageResponse<PluginAccountResponse> listAccounts(String pluginId, Boolean enabled, String accountId, String displayName, Integer page, Integer size) {
-        requireCapability(pluginId, PluginCapability.ACCOUNT);
+    public PageResponse<PluginAccountListItemResponse> listAccounts(String installationId, Boolean enabled, String accountId, String displayName, AuthenticatedUser user, Integer page, Integer size) {
+        return listAccounts(installationId, enabled, accountId, displayName, null, null, user, page, size);
+    }
+
+    public PageResponse<PluginAccountListItemResponse> listAccounts(String installationId, Boolean enabled, String accountId, String displayName, Long groupId, Boolean ungrouped, AuthenticatedUser user, Integer page, Integer size) {
+        PluginRuntimeRecord runtime = requireCapability(installationId, PluginCapability.ACCOUNT, user, PermissionNames.PLUGIN_ACCOUNT_READ);
+        validateGroupFilter(installationId, groupId, ungrouped);
         return new PageResponse<>(
-                accountStore.list(pluginId, enabled, accountId, displayName, page, size).stream().map(PluginAccountResponse::from).toList(),
+                accountListViewService.listItems(
+                        installationId,
+                        user.userId(),
+                        runtime.accountSchemaJson(),
+                        accountStore.list(installationId, enabled, accountId, displayName, groupId, Boolean.TRUE.equals(ungrouped), page, size)
+                ),
                 normalizedPage(page),
                 normalizedSize(size),
-                accountStore.count(pluginId, enabled, accountId, displayName)
+                accountStore.count(installationId, enabled, accountId, displayName, groupId, Boolean.TRUE.equals(ungrouped))
         );
     }
 
-    public PluginAccountExportFile exportAccounts(String pluginId, Boolean enabled, String accountId, String displayName, String format, Boolean includeSecret, String actor) {
-        PluginRuntimeRecord runtime = requireCapability(pluginId, PluginCapability.ACCOUNT);
+    public PluginAccountViewPreferenceResponse getAccountViewPreference(String installationId, AuthenticatedUser user) {
+        PluginRuntimeRecord runtime = requireCapability(installationId, PluginCapability.ACCOUNT, user, PermissionNames.PLUGIN_ACCOUNT_READ);
+        return accountListViewService.getPreference(installationId, user.userId(), runtime.accountSchemaJson());
+    }
+
+    public PluginAccountViewPreferenceResponse updateAccountViewPreference(
+            String installationId,
+            UpdatePluginAccountViewPreferenceRequest request,
+            AuthenticatedUser user
+    ) {
+        PluginRuntimeRecord runtime = requireCapability(installationId, PluginCapability.ACCOUNT, user, PermissionNames.PLUGIN_ACCOUNT_READ);
+        return accountListViewService.updatePreference(installationId, user.userId(), runtime.accountSchemaJson(), request);
+    }
+
+    public PluginAccountExportFile exportAccounts(String installationId, Boolean enabled, String accountId, String displayName, String format, Boolean includeSecret, AuthenticatedUser user) {
+        return exportAccounts(installationId, enabled, accountId, displayName, null, null, format, includeSecret, user);
+    }
+
+    public PluginAccountExportFile exportAccounts(String installationId, Boolean enabled, String accountId, String displayName, Long groupId, Boolean ungrouped, String format, Boolean includeSecret, AuthenticatedUser user) {
+        PluginRuntimeRecord runtime = requireCapability(installationId, PluginCapability.ACCOUNT, user, PermissionNames.PLUGIN_ACCOUNT_READ);
+        validateGroupFilter(installationId, groupId, ungrouped);
         AccountFileFormat fileFormat = exportFormat(format);
         boolean exportSecret = includeSecret != null && includeSecret;
         AccountFileSchema fileSchema = accountFileSchema(runtime.accountSchemaJson(), exportSecret);
-        List<PluginAccount> accounts = accountStore.listManagedForExport(pluginId, enabled, accountId, displayName, MAX_EXPORT_ROWS + 1);
+        List<PluginAccount> accounts = accountStore.listManagedForExport(installationId, enabled, accountId, displayName, groupId, Boolean.TRUE.equals(ungrouped), MAX_EXPORT_ROWS + 1);
         if (accounts.size() > MAX_EXPORT_ROWS) {
             throw new IllegalArgumentException("Too many accounts to export; please narrow filters");
         }
@@ -122,12 +178,15 @@ public class PluginManagementService {
             case CSV -> writeCsv(accounts, fileSchema);
             case XLSX -> writeXlsx(accounts, fileSchema);
         };
-        audit(pluginId, "", actor, "PLUGIN_ACCOUNT_EXPORT", accountExportDetail(fileFormat.name().toLowerCase(Locale.ROOT), accounts.size(), exportSecret, enabled, accountId, displayName));
-        return new PluginAccountExportFile(exportFilename(pluginId, fileFormat), fileFormat.contentType, content);
+        Map<String, Object> exportDetail = accountExportDetail(fileFormat.name().toLowerCase(Locale.ROOT), accounts.size(), exportSecret, enabled, accountId, displayName);
+        exportDetail.put("groupId", groupId);
+        exportDetail.put("ungrouped", Boolean.TRUE.equals(ungrouped));
+        audit(runtime, user.username(), "PLUGIN_ACCOUNT_EXPORT", exportDetail);
+        return new PluginAccountExportFile(exportFilename(installationId, fileFormat), fileFormat.contentType, content);
     }
 
-    public PluginAccountImportResponse importAccounts(String pluginId, MultipartFile file, Boolean dryRun, Boolean enabledDefault, String actor) {
-        PluginRuntimeRecord runtime = requireCapability(pluginId, PluginCapability.ACCOUNT);
+    public PluginAccountImportResponse importAccounts(String installationId, MultipartFile file, Boolean dryRun, Boolean enabledDefault, AuthenticatedUser user) {
+        PluginRuntimeRecord runtime = requireCapability(installationId, PluginCapability.ACCOUNT, user, PermissionNames.PLUGIN_ACCOUNT_WRITE);
         if (file == null || file.isEmpty()) {
             throw new IllegalArgumentException("Import file is required");
         }
@@ -153,9 +212,9 @@ public class PluginManagementService {
                 if (!seenAccountIds.add(item.accountId())) {
                     throw new IllegalArgumentException("Duplicate accountId in import file");
                 }
-                boolean exists = accountStore.getManaged(pluginId, item.accountId()).isPresent();
+                boolean exists = accountStore.getManaged(installationId, item.accountId()).isPresent();
                 if (!dry) {
-                    accountStore.upsert(pluginId, item.accountId(), item.displayName(), item.accountJson(), item.enabled());
+                    accountStore.upsert(installationId, item.accountId(), item.displayName(), item.accountJson(), item.enabled());
                 }
                 String operation = exists ? "UPDATE" : "CREATE";
                 if (exists) {
@@ -171,56 +230,59 @@ public class PluginManagementService {
             }
         }
 
-        PluginAccountImportResponse response = new PluginAccountImportResponse(pluginId, dry, rows.size(), successRows, failedRows, createdRows, updatedRows, results);
-        audit(pluginId, "", actor, "PLUGIN_ACCOUNT_IMPORT", accountImportDetail(fileFormat.name().toLowerCase(Locale.ROOT), response));
+        PluginAccountImportResponse response = new PluginAccountImportResponse(installationId, dry, rows.size(), successRows, failedRows, createdRows, updatedRows, results);
+        audit(runtime, user.username(), "PLUGIN_ACCOUNT_IMPORT", accountImportDetail(fileFormat.name().toLowerCase(Locale.ROOT), response));
         return response;
     }
 
-    public PluginAccountSchemaResponse getAccountSchema(String pluginId) {
-        PluginRuntimeRecord runtime = requireCapability(pluginId, PluginCapability.ACCOUNT);
-        return new PluginAccountSchemaResponse(pluginId, schema(runtime.accountSchemaJson()));
+    public PluginAccountSchemaResponse getAccountSchema(String installationId, AuthenticatedUser user) {
+        PluginRuntimeRecord runtime = requireCapability(installationId, PluginCapability.ACCOUNT, user, PermissionNames.PLUGIN_ACCOUNT_READ);
+        return new PluginAccountSchemaResponse(installationId, runtime.pluginId(), schema(runtime.accountSchemaJson()));
     }
 
-    public PluginAccountResponse getAccount(String pluginId, String accountId) {
-        requireCapability(pluginId, PluginCapability.ACCOUNT);
+    public PluginAccountResponse getAccount(String installationId, String accountId, AuthenticatedUser user, String permissionName) {
+        requireCapability(installationId, PluginCapability.ACCOUNT, user, permissionName);
         payloadValidator.validateAccountId(accountId);
-        return accountStore.getManaged(pluginId, accountId).map(PluginAccountResponse::from).orElseThrow(() -> new IllegalArgumentException("Plugin account not found"));
+        return accountStore.getManaged(installationId, accountId).map(PluginAccountResponse::from).orElseThrow(() -> new ResourceNotFoundException("Plugin account not found"));
     }
 
-    public PluginAccountResponse createAccount(String pluginId, UpsertPluginAccountRequest request, String actor) {
+    @Transactional
+    public PluginAccountResponse createAccount(String installationId, UpsertPluginAccountRequest request, AuthenticatedUser user) {
+        PluginRuntimeRecord runtime = requireCapability(installationId, PluginCapability.ACCOUNT, user, PermissionNames.PLUGIN_ACCOUNT_WRITE);
         if (request == null || request.accountId() == null || request.accountId().isBlank()) {
             throw new IllegalArgumentException("Invalid account id");
         }
         String accountJson = payloadValidator.normalizeAccountJson(request.accountJson());
-        PluginAccountResponse response = upsertAccount(pluginId, request.accountId(), request);
-        audit(pluginId, "", actor, "PLUGIN_ACCOUNT_CREATE", accountDetail("create", response, accountJson));
+        PluginAccountResponse response = upsertAccount(installationId, request.accountId(), request);
+        audit(runtime, user.username(), "PLUGIN_ACCOUNT_CREATE", accountDetail("create", response, accountJson));
         return response;
     }
 
-    public PluginAccountResponse updateAccount(String pluginId, String accountId, UpsertPluginAccountRequest request, String actor) {
-        requireCapability(pluginId, PluginCapability.ACCOUNT);
+    @Transactional
+    public PluginAccountResponse updateAccount(String installationId, String accountId, UpsertPluginAccountRequest request, AuthenticatedUser user) {
+        PluginRuntimeRecord runtime = requireCapability(installationId, PluginCapability.ACCOUNT, user, PermissionNames.PLUGIN_ACCOUNT_WRITE);
         payloadValidator.validateAccountId(accountId);
-        PluginAccount previous = accountStore.getManaged(pluginId, accountId).orElseThrow(() -> new IllegalArgumentException("Plugin account not found"));
+        PluginAccount previous = accountStore.getManaged(installationId, accountId).orElseThrow(() -> new ResourceNotFoundException("Plugin account not found"));
         String accountJson = payloadValidator.normalizeAccountJson(request == null ? null : request.accountJson());
-        PluginAccountResponse response = upsertAccount(pluginId, accountId, request);
-        audit(pluginId, "", actor, "PLUGIN_ACCOUNT_UPDATE", accountUpdateDetail(response, previous, accountJson));
+        PluginAccountResponse response = upsertAccount(installationId, accountId, request);
+        audit(runtime, user.username(), "PLUGIN_ACCOUNT_UPDATE", accountUpdateDetail(response, previous, accountJson));
         return response;
     }
 
-    public PluginAccountResponse updateAccountEnabled(String pluginId, String accountId, UpdatePluginAccountStateRequest request, String actor) {
-        requireCapability(pluginId, PluginCapability.ACCOUNT);
+    public PluginAccountResponse updateAccountEnabled(String installationId, String accountId, UpdatePluginAccountStateRequest request, AuthenticatedUser user) {
+        PluginRuntimeRecord runtime = requireCapability(installationId, PluginCapability.ACCOUNT, user, PermissionNames.PLUGIN_ACCOUNT_WRITE);
         payloadValidator.validateAccountId(accountId);
-        PluginAccount previous = accountStore.getManaged(pluginId, accountId).orElseThrow(() -> new IllegalArgumentException("Plugin account not found"));
-        if (accountStore.updateEnabled(pluginId, accountId, request.enabled()) == 0) {
-            throw new IllegalArgumentException("Plugin account not found");
+        PluginAccount previous = accountStore.getManaged(installationId, accountId).orElseThrow(() -> new ResourceNotFoundException("Plugin account not found"));
+        if (accountStore.updateEnabled(installationId, accountId, request.enabled()) == 0) {
+            throw new ResourceNotFoundException("Plugin account not found");
         }
-        PluginAccountResponse response = getAccount(pluginId, accountId);
-        audit(pluginId, "", actor, request.enabled() ? "PLUGIN_ACCOUNT_ENABLE" : "PLUGIN_ACCOUNT_DISABLE", accountStateDetail(request.enabled() ? "enable" : "disable", response, previous.enabled()));
+        PluginAccountResponse response = getAccount(installationId, accountId, user, PermissionNames.PLUGIN_ACCOUNT_WRITE);
+        audit(runtime, user.username(), request.enabled() ? "PLUGIN_ACCOUNT_ENABLE" : "PLUGIN_ACCOUNT_DISABLE", accountStateDetail(request.enabled() ? "enable" : "disable", response, previous.enabled()));
         return response;
     }
 
-    public BatchUpdatePluginAccountStateResponse updateAccountsEnabled(String pluginId, BatchUpdatePluginAccountStateRequest request, String actor) {
-        requireCapability(pluginId, PluginCapability.ACCOUNT);
+    public BatchUpdatePluginAccountStateResponse updateAccountsEnabled(String installationId, BatchUpdatePluginAccountStateRequest request, AuthenticatedUser user) {
+        PluginRuntimeRecord runtime = requireCapability(installationId, PluginCapability.ACCOUNT, user, PermissionNames.PLUGIN_ACCOUNT_WRITE);
         if (request == null || request.accountIds() == null || request.accountIds().isEmpty()) {
             throw new IllegalArgumentException("Account ids are required");
         }
@@ -238,10 +300,10 @@ public class PluginManagementService {
                 if (!seenAccountIds.add(normalizedAccountId)) {
                     throw new IllegalArgumentException("Duplicate account id");
                 }
-                if (accountStore.getManaged(pluginId, normalizedAccountId).isEmpty()) {
+                if (accountStore.getManaged(installationId, normalizedAccountId).isEmpty()) {
                     throw new IllegalArgumentException("Plugin account not found");
                 }
-                if (accountStore.updateEnabled(pluginId, normalizedAccountId, request.enabled()) == 0) {
+                if (accountStore.updateEnabled(installationId, normalizedAccountId, request.enabled()) == 0) {
                     throw new IllegalArgumentException("Plugin account not found");
                 }
                 succeeded++;
@@ -251,19 +313,53 @@ public class PluginManagementService {
                 receipts.add(new BatchPluginAccountStateReceipt(accountId, false, exception.getMessage()));
             }
         }
-        BatchUpdatePluginAccountStateResponse response = new BatchUpdatePluginAccountStateResponse(pluginId, request.enabled(), request.accountIds().size(), succeeded, failed, receipts);
-        audit(pluginId, "", actor, request.enabled() ? "PLUGIN_ACCOUNT_BATCH_ENABLE" : "PLUGIN_ACCOUNT_BATCH_DISABLE", accountBatchStateDetail(response));
+        BatchUpdatePluginAccountStateResponse response = new BatchUpdatePluginAccountStateResponse(installationId, request.enabled(), request.accountIds().size(), succeeded, failed, receipts);
+        audit(runtime, user.username(), request.enabled() ? "PLUGIN_ACCOUNT_BATCH_ENABLE" : "PLUGIN_ACCOUNT_BATCH_DISABLE", accountBatchStateDetail(response));
         return response;
     }
 
-    public void deleteAccount(String pluginId, String accountId, String actor) {
-        requireCapability(pluginId, PluginCapability.ACCOUNT);
-        payloadValidator.validateAccountId(accountId);
-        PluginAccount previous = accountStore.getManaged(pluginId, accountId).orElseThrow(() -> new IllegalArgumentException("Plugin account not found"));
-        if (accountStore.delete(pluginId, accountId) == 0) {
-            throw new IllegalArgumentException("Plugin account not found");
+    public BatchDeletePluginAccountResponse deleteAccounts(String installationId, BatchDeletePluginAccountRequest request, AuthenticatedUser user) {
+        PluginRuntimeRecord runtime = requireCapability(installationId, PluginCapability.ACCOUNT, user, PermissionNames.PLUGIN_ACCOUNT_WRITE);
+        if (request == null || request.accountIds() == null || request.accountIds().isEmpty()) {
+            throw new IllegalArgumentException("Account ids are required");
         }
-        audit(pluginId, "", actor, "PLUGIN_ACCOUNT_DELETE", accountDeleteDetail(previous));
+        List<BatchPluginAccountDeleteReceipt> receipts = new ArrayList<>();
+        Set<String> seenAccountIds = new HashSet<>();
+        int succeeded = 0;
+        int failed = 0;
+        for (String accountId : request.accountIds()) {
+            try {
+                if (accountId == null || accountId.isBlank()) {
+                    throw new IllegalArgumentException("Invalid account id");
+                }
+                String normalizedAccountId = accountId.trim();
+                payloadValidator.validateAccountId(normalizedAccountId);
+                if (!seenAccountIds.add(normalizedAccountId)) {
+                    throw new IllegalArgumentException("Duplicate account id");
+                }
+                if (accountStore.delete(installationId, normalizedAccountId) == 0) {
+                    throw new IllegalArgumentException("Plugin account not found");
+                }
+                succeeded++;
+                receipts.add(new BatchPluginAccountDeleteReceipt(normalizedAccountId, true, "Deleted"));
+            } catch (Exception exception) {
+                failed++;
+                receipts.add(new BatchPluginAccountDeleteReceipt(accountId, false, exception.getMessage()));
+            }
+        }
+        BatchDeletePluginAccountResponse response = new BatchDeletePluginAccountResponse(installationId, request.accountIds().size(), succeeded, failed, receipts);
+        audit(runtime, user.username(), "PLUGIN_ACCOUNT_BATCH_DELETE", accountBatchDeleteDetail(response));
+        return response;
+    }
+
+    public void deleteAccount(String installationId, String accountId, AuthenticatedUser user) {
+        PluginRuntimeRecord runtime = requireCapability(installationId, PluginCapability.ACCOUNT, user, PermissionNames.PLUGIN_ACCOUNT_WRITE);
+        payloadValidator.validateAccountId(accountId);
+        PluginAccount previous = accountStore.getManaged(installationId, accountId).orElseThrow(() -> new ResourceNotFoundException("Plugin account not found"));
+        if (accountStore.delete(installationId, accountId) == 0) {
+            throw new ResourceNotFoundException("Plugin account not found");
+        }
+        audit(runtime, user.username(), "PLUGIN_ACCOUNT_DELETE", accountDeleteDetail(previous));
     }
 
     private List<ImportedAccountRow> parseImportRows(MultipartFile file, AccountFileFormat format, AccountFileSchema fileSchema) {
@@ -374,8 +470,13 @@ public class PluginManagementService {
         accountId = accountId.trim();
         payloadValidator.validateAccountId(accountId);
         ObjectNode accountJsonNode = objectMapper.createObjectNode();
-        for (String field : fileSchema.importFields()) {
-            accountJsonNode.put(field, value(row.values().get(field)));
+        for (AccountFileField field : fileSchema.importFields()) {
+            String fieldValue = value(row.values().get(field.name()));
+            if (field.isComplex()) {
+                accountJsonNode.set(field.name(), complexImportValue(field, fieldValue));
+            } else {
+                accountJsonNode.put(field.name(), fieldValue);
+            }
         }
         String accountJson = payloadValidator.normalizeAccountJson(accountJsonNode.toString());
         boolean enabled = parseEnabled(row.values().get("enabled"), enabledDefault);
@@ -426,9 +527,9 @@ public class PluginManagementService {
     private Map<String, String> exportFieldValues(PluginAccount account, AccountFileSchema fileSchema) {
         Map<String, String> values = new LinkedHashMap<>();
         JsonNode root = accountJson(account.accountJson());
-        for (String field : fileSchema.importFields()) {
-            JsonNode value = root.path(field);
-            values.put(field, value.isMissingNode() || value.isNull() ? "" : value.asText(""));
+        for (AccountFileField field : fileSchema.importFields()) {
+            JsonNode fieldValue = root.path(field.name());
+            values.put(field.name(), exportFieldValue(field, fieldValue));
         }
         if (fileSchema.headers().contains("enabled")) {
             values.put("enabled", String.valueOf(account.enabled()));
@@ -443,21 +544,22 @@ public class PluginManagementService {
             if (accountIdField.isBlank()) {
                 throw new IllegalArgumentException("Plugin account schema is missing accountIdField");
             }
-            List<String> importFields = new ArrayList<>();
+            List<AccountFileField> importFields = new ArrayList<>();
             JsonNode fields = root.path("fields");
             if (fields.isArray()) {
                 fields.forEach(field -> {
                     String name = field.path("name").asText("").trim();
+                    String type = field.path("type").asText("TEXT").trim().toUpperCase(Locale.ROOT);
                     boolean sensitive = field.path("sensitive").asBoolean(false);
                     if (!name.isBlank() && (includeSensitive || !sensitive)) {
-                        importFields.add(name);
+                        importFields.add(new AccountFileField(name, type.isBlank() ? "TEXT" : type));
                     }
                 });
             }
-            if (!importFields.contains(accountIdField)) {
-                importFields.add(0, accountIdField);
+            if (importFields.stream().noneMatch(field -> field.name().equals(accountIdField))) {
+                importFields.add(0, new AccountFileField(accountIdField, "TEXT"));
             }
-            List<String> headers = new ArrayList<>(importFields);
+            List<String> headers = new ArrayList<>(importFields.stream().map(AccountFileField::name).toList());
             headers.add("enabled");
             return new AccountFileSchema(accountIdField, List.copyOf(importFields), List.copyOf(headers));
         } catch (JsonProcessingException exception) {
@@ -471,6 +573,37 @@ public class PluginManagementService {
         } catch (JsonProcessingException exception) {
             throw new IllegalStateException("Invalid stored account JSON", exception);
         }
+    }
+
+    private JsonNode complexImportValue(AccountFileField field, String rawValue) {
+        if (rawValue.isBlank()) {
+            return field.expectsArray() ? objectMapper.createArrayNode() : objectMapper.createObjectNode();
+        }
+        JsonNode parsed;
+        try {
+            parsed = objectMapper.readTree(rawValue);
+        } catch (JsonProcessingException exception) {
+            throw invalidComplexFieldValue(field, exception);
+        }
+        if (parsed == null || (field.expectsArray() && !parsed.isArray()) || (field.expectsObject() && !parsed.isObject())) {
+            throw invalidComplexFieldValue(field, null);
+        }
+        return parsed;
+    }
+
+    private String exportFieldValue(AccountFileField field, JsonNode fieldValue) {
+        if (fieldValue.isMissingNode() || fieldValue.isNull()) {
+            return "";
+        }
+        if (field.isComplex() && fieldValue.isContainerNode()) {
+            return fieldValue.toString();
+        }
+        return fieldValue.asText("");
+    }
+
+    private IllegalArgumentException invalidComplexFieldValue(AccountFileField field, Exception cause) {
+        String message = "Invalid JSON for account field '" + field.name() + "': expected " + field.expectedJsonType();
+        return cause == null ? new IllegalArgumentException(message) : new IllegalArgumentException(message, cause);
     }
 
     private boolean hasHeader(Map<String, Integer> headers, String header) {
@@ -534,14 +667,132 @@ public class PluginManagementService {
         return "plugin-" + pluginId.replaceAll("[^a-zA-Z0-9._-]", "_") + "-accounts." + format.extension;
     }
 
-    private PluginAccountResponse upsertAccount(String pluginId, String accountId, UpsertPluginAccountRequest request) {
-        requireCapability(pluginId, PluginCapability.ACCOUNT);
+    public List<PluginAccountGroup> listAccountGroups(String installationId, AuthenticatedUser user) {
+        requireCapability(installationId, PluginCapability.ACCOUNT, user, PermissionNames.PLUGIN_ACCOUNT_READ);
+        return accountGroupStore.list(installationId);
+    }
+
+    @Transactional
+    public PluginAccountGroup createAccountGroup(String installationId, UpsertPluginAccountGroupRequest request, AuthenticatedUser user) {
+        PluginRuntimeRecord runtime = requireCapability(installationId, PluginCapability.ACCOUNT, user, PermissionNames.PLUGIN_ACCOUNT_WRITE);
+        String name = groupName(request);
+        long groupId;
+        try {
+            groupId = accountGroupStore.insert(installationId, name);
+        } catch (DuplicateKeyException exception) {
+            throw new IllegalStateException("Plugin account group name already exists", exception);
+        }
+        PluginAccountGroup group = requireGroup(installationId, groupId, false);
+        audit(runtime, user.username(), "PLUGIN_ACCOUNT_GROUP_CREATE", Map.of("groupId", groupId, "name", name));
+        return group;
+    }
+
+    @Transactional
+    public PluginAccountGroup renameAccountGroup(String installationId, long groupId, UpsertPluginAccountGroupRequest request, AuthenticatedUser user) {
+        PluginRuntimeRecord runtime = requireCapability(installationId, PluginCapability.ACCOUNT, user, PermissionNames.PLUGIN_ACCOUNT_WRITE);
+        String name = groupName(request);
+        PluginAccountGroup previous = requireGroup(installationId, groupId, true);
+        try {
+            accountGroupStore.rename(installationId, groupId, name);
+        } catch (DuplicateKeyException exception) {
+            throw new IllegalStateException("Plugin account group name already exists", exception);
+        }
+        audit(runtime, user.username(), "PLUGIN_ACCOUNT_GROUP_RENAME", Map.of("groupId", groupId, "name", name, "previousName", previous.name()));
+        return requireGroup(installationId, groupId, false);
+    }
+
+    @Transactional
+    public void deleteAccountGroup(String installationId, long groupId, AuthenticatedUser user) {
+        PluginRuntimeRecord runtime = requireCapability(installationId, PluginCapability.ACCOUNT, user, PermissionNames.PLUGIN_ACCOUNT_WRITE);
+        PluginAccountGroup group = requireGroup(installationId, groupId, true);
+        int moved = accountStore.clearGroup(installationId, groupId);
+        accountGroupStore.delete(installationId, groupId);
+        audit(runtime, user.username(), "PLUGIN_ACCOUNT_GROUP_DELETE", Map.of("groupId", groupId, "name", group.name(), "ungroupedAccounts", moved));
+    }
+
+    @Transactional
+    public PluginAccountResponse updateAccountGroup(String installationId, String accountId, UpdatePluginAccountGroupRequest request, AuthenticatedUser user) {
+        PluginRuntimeRecord runtime = requireCapability(installationId, PluginCapability.ACCOUNT, user, PermissionNames.PLUGIN_ACCOUNT_WRITE);
+        validateGroupRequest(installationId, request);
         payloadValidator.validateAccountId(accountId);
+        PluginAccount previous = accountStore.getManaged(installationId, accountId).orElseThrow(() -> new ResourceNotFoundException("Plugin account not found"));
+        accountStore.updateGroup(installationId, accountId, request.groupId());
+        PluginAccountResponse response = getAccount(installationId, accountId, user, PermissionNames.PLUGIN_ACCOUNT_WRITE);
+        Map<String, Object> detail = new LinkedHashMap<>();
+        detail.put("accountId", accountId);
+        detail.put("previousGroupId", previous.groupId());
+        detail.put("groupId", request.groupId());
+        audit(runtime, user.username(), "PLUGIN_ACCOUNT_GROUP_MOVE", detail);
+        return response;
+    }
+
+    @Transactional
+    public BatchUpdatePluginAccountGroupResponse updateAccountsGroup(String installationId, UpdatePluginAccountGroupRequest request, AuthenticatedUser user) {
+        PluginRuntimeRecord runtime = requireCapability(installationId, PluginCapability.ACCOUNT, user, PermissionNames.PLUGIN_ACCOUNT_WRITE);
+        if (request == null || request.accountIds() == null || request.accountIds().isEmpty()) {
+            throw new IllegalArgumentException("Account ids are required");
+        }
+        validateGroupRequest(installationId, request);
+        Set<String> seen = new HashSet<>();
+        List<BatchPluginAccountGroupReceipt> receipts = new ArrayList<>();
+        int succeeded = 0;
+        for (String rawId : request.accountIds()) {
+            try {
+                if (rawId == null || rawId.isBlank()) throw new IllegalArgumentException("Invalid account id");
+                String accountId = rawId.trim();
+                payloadValidator.validateAccountId(accountId);
+                if (!seen.add(accountId)) throw new IllegalArgumentException("Duplicate account id");
+                if (accountStore.getManaged(installationId, accountId).isEmpty()) throw new IllegalArgumentException("Plugin account not found");
+                if (accountStore.updateGroup(installationId, accountId, request.groupId()) == 0) throw new IllegalArgumentException("Plugin account not found");
+                succeeded++;
+                receipts.add(new BatchPluginAccountGroupReceipt(accountId, true, "Updated"));
+            } catch (IllegalArgumentException exception) {
+                receipts.add(new BatchPluginAccountGroupReceipt(rawId, false, exception.getMessage()));
+            }
+        }
+        BatchUpdatePluginAccountGroupResponse response = new BatchUpdatePluginAccountGroupResponse(installationId, request.groupId(), receipts.size(), succeeded, receipts.size() - succeeded, receipts);
+        Map<String, Object> detail = new LinkedHashMap<>();
+        detail.put("groupId", request.groupId());
+        detail.put("total", response.total());
+        detail.put("succeeded", response.succeeded());
+        detail.put("failed", response.failed());
+        detail.put("receipts", receipts);
+        audit(runtime, user.username(), "PLUGIN_ACCOUNT_GROUP_BATCH_MOVE", detail);
+        return response;
+    }
+
+    private void validateGroupRequest(String installationId, UpdatePluginAccountGroupRequest request) {
+        if (request == null || !request.groupIdPresent()) throw new IllegalArgumentException("Group id field is required; use null to ungroup accounts");
+        if (request.groupId() != null) requireGroup(installationId, request.groupId(), true);
+    }
+
+    private void validateGroupFilter(String installationId, Long groupId, Boolean ungrouped) {
+        if (groupId != null && Boolean.TRUE.equals(ungrouped)) throw new IllegalArgumentException("Group id and ungrouped filters cannot be combined");
+        if (groupId != null) requireGroup(installationId, groupId, false);
+    }
+
+    private PluginAccountGroup requireGroup(String installationId, long groupId, boolean lock) {
+        if (groupId <= 0) throw new IllegalArgumentException("Invalid group id");
+        return (lock ? accountGroupStore.lock(installationId, groupId) : accountGroupStore.find(installationId, groupId))
+                .orElseThrow(() -> new ResourceNotFoundException("Plugin account group not found"));
+    }
+
+    private String groupName(UpsertPluginAccountGroupRequest request) {
+        String name = request == null || request.name() == null ? "" : request.name().trim();
+        if (name.isBlank() || name.length() > 128) throw new IllegalArgumentException("Group name must contain 1 to 128 characters");
+        return name;
+    }
+
+    private PluginAccountResponse upsertAccount(String installationId, String accountId, UpsertPluginAccountRequest request) {
+        payloadValidator.validateAccountId(accountId);
+        Long groupId = request == null ? null : request.groupId();
+        if (groupId != null) requireGroup(installationId, groupId, true);
         String displayName = displayName(request == null ? null : request.displayName(), accountId);
         String accountJson = payloadValidator.normalizeAccountJson(request == null ? null : request.accountJson());
         boolean enabled = request == null || request.enabled() == null || request.enabled();
-        accountStore.upsert(pluginId, accountId, displayName, accountJson, enabled);
-        PluginAccount account = accountStore.getManaged(pluginId, accountId).orElseThrow(() -> new IllegalStateException("Plugin account was not saved"));
+        accountStore.upsert(installationId, accountId, displayName, accountJson, enabled);
+        if (groupId != null) accountStore.updateGroup(installationId, accountId, groupId);
+        PluginAccount account = accountStore.getManaged(installationId, accountId).orElseThrow(() -> new IllegalStateException("Plugin account was not saved"));
         return PluginAccountResponse.from(account);
     }
 
@@ -561,6 +812,7 @@ public class PluginManagementService {
         detail.put("accountId", account.accountId());
         detail.put("displayName", account.displayName());
         detail.put("enabled", account.enabled());
+        detail.put("groupId", account.groupId());
         detail.put("accountJsonPresent", hasJsonPayload(accountJson));
         detail.put("accountJsonBytes", utf8Bytes(accountJson));
         return detail;
@@ -570,6 +822,7 @@ public class PluginManagementService {
         Map<String, Object> detail = accountDetail("update", account, accountJson);
         detail.put("previousDisplayName", previous.displayName());
         detail.put("previousEnabled", previous.enabled());
+        detail.put("previousGroupId", previous.groupId());
         return detail;
     }
 
@@ -606,6 +859,16 @@ public class PluginManagementService {
         return detail;
     }
 
+    private Map<String, Object> accountBatchDeleteDetail(BatchDeletePluginAccountResponse response) {
+        Map<String, Object> detail = new LinkedHashMap<>();
+        detail.put("operation", "batch_delete");
+        detail.put("capability", PluginCapability.ACCOUNT.name());
+        detail.put("total", response.total());
+        detail.put("succeeded", response.succeeded());
+        detail.put("failed", response.failed());
+        return detail;
+    }
+
     private Map<String, Object> accountImportDetail(String format, PluginAccountImportResponse response) {
         Map<String, Object> detail = new LinkedHashMap<>();
         detail.put("operation", "import");
@@ -633,13 +896,13 @@ public class PluginManagementService {
         return detail;
     }
 
-    private void audit(String pluginId, String instanceId, String actor, String action, Map<String, Object> detail) {
+    private void audit(PluginRuntimeRecord runtime, String actor, String action, Map<String, Object> detail) {
         try {
-            auditStore.insert(pluginId, instanceId, actor, action, objectMapper.writeValueAsString(detail));
+            auditStore.insert(runtime.installationId(), runtime.pluginId(), runtime.instanceId(), actor, action, objectMapper.writeValueAsString(detail));
         } catch (JsonProcessingException exception) {
-            log.warn("Failed to serialize plugin management audit detail: pluginId={}, action={}", pluginId, action, exception);
+            log.warn("Failed to serialize plugin management audit detail: installationId={}, action={}", runtime.installationId(), action, exception);
         } catch (RuntimeException exception) {
-            log.warn("Failed to write plugin management audit log: pluginId={}, action={}", pluginId, action, exception);
+            log.warn("Failed to write plugin management audit log: installationId={}, action={}", runtime.installationId(), action, exception);
         }
     }
 
@@ -651,8 +914,11 @@ public class PluginManagementService {
         return normalizedJson != null && !normalizedJson.isBlank();
     }
 
-    private PluginRuntimeRecord requireCapability(String pluginId, PluginCapability capability) {
-        PluginRuntimeRecord runtime = runtimeStore.findRuntimeByPluginId(pluginId).orElseThrow(() -> new IllegalArgumentException("Plugin runtime not found"));
+    private PluginRuntimeRecord requireCapability(String installationId, PluginCapability capability, AuthenticatedUser user, String permissionName) {
+        PluginRuntimeRecord runtime = runtimeStore.findRuntimeByInstallationId(installationId).orElseThrow(() -> new ResourceNotFoundException("Plugin installation not found"));
+        if (!dataScopeService.allows(dataScopeService.resolve(user, permissionName), runtime.ownerUserId(), runtime.ownerDepartmentId())) {
+            throw new ResourceNotFoundException("Plugin installation not found");
+        }
         Set<PluginCapability> capabilities = runtimeStore.runtimeCapabilities(runtime.capabilitiesJson());
         if (!capabilities.contains(capability)) {
             String name = capability == PluginCapability.CONFIG ? "config" : "account";
@@ -706,9 +972,30 @@ public class PluginManagementService {
 
     private record AccountFileSchema(
             String accountIdField,
-            List<String> importFields,
+            List<AccountFileField> importFields,
             List<String> headers
     ) {
+    }
+
+    private record AccountFileField(
+            String name,
+            String type
+    ) {
+        private boolean expectsArray() {
+            return "LIST".equals(type) || "MULTI_SELECT".equals(type) || "OBJECT_LIST".equals(type);
+        }
+
+        private boolean expectsObject() {
+            return "MAP".equals(type);
+        }
+
+        private boolean isComplex() {
+            return expectsArray() || expectsObject();
+        }
+
+        private String expectedJsonType() {
+            return expectsArray() ? "array" : "object";
+        }
     }
 
     private record AccountImportItem(

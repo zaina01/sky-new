@@ -3,7 +3,7 @@ package com.sky.job.plugin.management.dto;
 import java.util.List;
 
 public record BatchUpdatePluginAccountStateResponse(
-        String pluginId,
+        String installationId,
         boolean enabled,
         int total,
         int succeeded,

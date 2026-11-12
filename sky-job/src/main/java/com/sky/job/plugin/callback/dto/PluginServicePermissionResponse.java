@@ -6,7 +6,9 @@ import java.time.LocalDateTime;
 
 public record PluginServicePermissionResponse(
         long id,
+        String callerInstallationId,
         String callerPluginId,
+        String targetInstallationId,
         String targetPluginId,
         String operation,
         boolean enabled,
@@ -16,7 +18,9 @@ public record PluginServicePermissionResponse(
     public static PluginServicePermissionResponse from(PluginServicePermission permission) {
         return new PluginServicePermissionResponse(
                 permission.id(),
+                permission.callerInstallationId(),
                 permission.callerPluginId(),
+                permission.targetInstallationId(),
                 permission.targetPluginId(),
                 permission.operation(),
                 permission.enabled(),

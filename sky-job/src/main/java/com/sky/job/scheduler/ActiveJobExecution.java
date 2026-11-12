@@ -9,6 +9,7 @@ public final class ActiveJobExecution {
     private final long executionId;
     private final long jobId;
     private final String jobName;
+    private final String pluginInstallationId;
     private final String pluginId;
     private final String instanceId;
     private final String requestId;
@@ -23,6 +24,7 @@ public final class ActiveJobExecution {
             long executionId,
             long jobId,
             String jobName,
+            String pluginInstallationId,
             String pluginId,
             String instanceId,
             String requestId,
@@ -34,6 +36,7 @@ public final class ActiveJobExecution {
         this.executionId = executionId;
         this.jobId = jobId;
         this.jobName = jobName;
+        this.pluginInstallationId = pluginInstallationId;
         this.pluginId = pluginId;
         this.instanceId = instanceId;
         this.requestId = requestId;
@@ -57,6 +60,10 @@ public final class ActiveJobExecution {
 
     public String pluginId() {
         return pluginId;
+    }
+
+    public String pluginInstallationId() {
+        return pluginInstallationId;
     }
 
     public String instanceId() {

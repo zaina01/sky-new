@@ -15,58 +15,78 @@ public class PluginAccountStore {
         this.mapper = mapper;
     }
 
-    public List<AccountRecord> list(String pluginId) {
-        return mapper.listByPluginId(pluginId).stream().map(this::toRecord).toList();
+    public List<AccountRecord> list(String installationId) {
+        return mapper.listByInstallationId(installationId).stream().map(this::toRecord).toList();
     }
 
-    public List<AccountRecord> listEnabled(String pluginId) {
-        return mapper.listEnabledByPluginId(pluginId).stream().map(this::toRecord).toList();
+    public List<AccountRecord> listEnabled(String installationId) {
+        return mapper.listEnabledByInstallationId(installationId).stream().map(this::toRecord).toList();
     }
 
-    public Optional<AccountRecord> get(String pluginId, String accountId) {
-        return Optional.ofNullable(mapper.getRecord(pluginId, accountId)).map(this::toRecord);
+    public Optional<AccountRecord> get(String installationId, String accountId) {
+        return Optional.ofNullable(mapper.getRecord(installationId, accountId)).map(this::toRecord);
     }
 
-    public Optional<AccountRecord> getEnabled(String pluginId, String accountId) {
-        return Optional.ofNullable(mapper.getEnabledRecord(pluginId, accountId)).map(this::toRecord);
+    public Optional<AccountRecord> getEnabled(String installationId, String accountId) {
+        return Optional.ofNullable(mapper.getEnabledRecord(installationId, accountId)).map(this::toRecord);
     }
 
-    public List<PluginAccount> list(String pluginId, Boolean enabled, String accountId, String displayName, Integer page, Integer size) {
+    public List<PluginAccount> list(String installationId, Boolean enabled, String accountId, String displayName, Integer page, Integer size) {
+        return list(installationId, enabled, accountId, displayName, null, false, page, size);
+    }
+
+    public List<PluginAccount> list(String installationId, Boolean enabled, String accountId, String displayName, Long groupId, boolean ungrouped, Integer page, Integer size) {
         int normalizedPage = Math.max(page == null ? 1 : page, 1);
         int normalizedSize = Math.min(Math.max(size == null ? 20 : size, 1), 100);
-        return mapper.listManaged(pluginId, enabled, accountId, like(accountId), displayName, like(displayName), normalizedSize, (normalizedPage - 1) * normalizedSize);
+        return mapper.listManaged(installationId, enabled, accountId, like(accountId), displayName, like(displayName), groupId, ungrouped, normalizedSize, (normalizedPage - 1) * normalizedSize);
     }
 
-    public long count(String pluginId, Boolean enabled, String accountId, String displayName) {
-        return mapper.countManaged(pluginId, enabled, accountId, like(accountId), displayName, like(displayName));
+    public long count(String installationId, Boolean enabled, String accountId, String displayName) {
+        return count(installationId, enabled, accountId, displayName, null, false);
     }
 
-    public List<PluginAccount> listManagedForExport(String pluginId, Boolean enabled, String accountId, String displayName, int limit) {
-        return mapper.listManagedForExport(pluginId, enabled, accountId, like(accountId), displayName, like(displayName), limit);
+    public long count(String installationId, Boolean enabled, String accountId, String displayName, Long groupId, boolean ungrouped) {
+        return mapper.countManaged(installationId, enabled, accountId, like(accountId), displayName, like(displayName), groupId, ungrouped);
     }
 
-    public Optional<PluginAccount> getManaged(String pluginId, String accountId) {
-        return Optional.ofNullable(mapper.getRecord(pluginId, accountId));
+    public List<PluginAccount> listManagedForExport(String installationId, Boolean enabled, String accountId, String displayName, int limit) {
+        return listManagedForExport(installationId, enabled, accountId, displayName, null, false, limit);
     }
 
-    public void upsert(String pluginId, String accountId, String accountJson) {
-        upsert(pluginId, accountId, accountId, accountJson, true);
+    public List<PluginAccount> listManagedForExport(String installationId, Boolean enabled, String accountId, String displayName, Long groupId, boolean ungrouped, int limit) {
+        return mapper.listManagedForExport(installationId, enabled, accountId, like(accountId), displayName, like(displayName), groupId, ungrouped, limit);
     }
 
-    public void upsert(String pluginId, String accountId, String displayName, String accountJson, boolean enabled) {
-        mapper.upsert(pluginId, accountId, displayName, accountJson, enabled);
+    public Optional<PluginAccount> getManaged(String installationId, String accountId) {
+        return Optional.ofNullable(mapper.getRecord(installationId, accountId));
     }
 
-    public int updateEnabled(String pluginId, String accountId, boolean enabled) {
-        return mapper.updateEnabled(pluginId, accountId, enabled);
+    public void upsert(String installationId, String accountId, String accountJson) {
+        upsert(installationId, accountId, accountId, accountJson, true);
     }
 
-    public int delete(String pluginId, String accountId) {
-        return mapper.delete(pluginId, accountId);
+    public void upsert(String installationId, String accountId, String displayName, String accountJson, boolean enabled) {
+        mapper.upsert(installationId, accountId, displayName, accountJson, enabled);
     }
 
-    public int deleteByPluginId(String pluginId) {
-        return mapper.deleteByPluginId(pluginId);
+    public int updateEnabled(String installationId, String accountId, boolean enabled) {
+        return mapper.updateEnabled(installationId, accountId, enabled);
+    }
+
+    public int delete(String installationId, String accountId) {
+        return mapper.delete(installationId, accountId);
+    }
+
+    public int deleteByInstallationId(String installationId) {
+        return mapper.deleteByInstallationId(installationId);
+    }
+
+    public int updateGroup(String installationId, String accountId, Long groupId) {
+        return mapper.updateGroup(installationId, accountId, groupId);
+    }
+
+    public int clearGroup(String installationId, long groupId) {
+        return mapper.clearGroup(installationId, groupId);
     }
 
     private String like(String value) {

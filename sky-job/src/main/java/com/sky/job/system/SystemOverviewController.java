@@ -5,6 +5,8 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import com.sky.job.security.AuthenticatedUser;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 
 @RestController
 @RequestMapping("/system/overview")
@@ -19,8 +21,9 @@ public class SystemOverviewController {
     public SystemOverviewResponse overview(
             @RequestParam(required = false) Integer windowHours,
             @RequestParam(required = false) Integer trendDays,
-            @RequestParam(required = false) Integer recentLimit
+            @RequestParam(required = false) Integer recentLimit,
+            @AuthenticationPrincipal AuthenticatedUser user
     ) {
-        return overviewService.overview(windowHours, trendDays, recentLimit);
+        return overviewService.overview(user, windowHours, trendDays, recentLimit);
     }
 }

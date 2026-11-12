@@ -25,22 +25,24 @@ public class JobExecutionController {
     @GetMapping
     public PageResponse<JobExecutionResponse> list(
             @RequestParam(required = false) Long jobId,
+            @RequestParam(required = false) String pluginInstallationId,
             @RequestParam(required = false) String pluginId,
             @RequestParam(required = false) JobExecutionStatus status,
             @RequestParam(required = false) Integer page,
-            @RequestParam(required = false) Integer size
+            @RequestParam(required = false) Integer size,
+            @AuthenticationPrincipal AuthenticatedUser user
     ) {
-        return jobService.executions(jobId, pluginId, status, page, size);
+        return jobService.executions(jobId, pluginInstallationId, pluginId, status, user, page, size);
     }
 
     @GetMapping("/{id}")
-    public JobExecutionResponse get(@PathVariable long id) {
-        return jobService.execution(id);
+    public JobExecutionResponse get(@PathVariable long id, @AuthenticationPrincipal AuthenticatedUser user) {
+        return jobService.execution(id, user);
     }
 
     @PostMapping("/{id}/cancel")
     public JobExecutionResponse cancel(@PathVariable long id, @AuthenticationPrincipal AuthenticatedUser user, HttpServletRequest httpRequest) {
-        return jobService.cancelExecution(id, user.username(), httpRequest);
+        return jobService.cancelExecution(id, user, httpRequest);
     }
 
     @GetMapping("/{id}/logs")
@@ -48,8 +50,9 @@ public class JobExecutionController {
             @PathVariable long id,
             @RequestParam(required = false) Long offset,
             @RequestParam(required = false) Integer limitBytes,
-            @RequestParam(required = false) Integer tailBytes
+            @RequestParam(required = false) Integer tailBytes,
+            @AuthenticationPrincipal AuthenticatedUser user
     ) {
-        return jobService.executionLogs(id, offset, limitBytes, tailBytes);
+        return jobService.executionLogs(id, user, offset, limitBytes, tailBytes);
     }
 }

@@ -7,6 +7,7 @@
         <constructor>
             <arg column="id" javaType="java.lang.Long"/>
             <arg column="user_id" javaType="java.lang.String"/>
+            <arg column="owner_dept_id" javaType="java.lang.Long"/>
             <arg column="username" javaType="java.lang.String"/>
             <arg column="status" javaType="java.lang.String"/>
             <arg column="login_time" javaType="java.time.LocalDateTime"/>
@@ -22,8 +23,8 @@
     </resultMap>
 
     <insert id="insert">
-        INSERT INTO login_log (user_id, username, status, device_type, login_ip, ip_type, user_agent, fail_reason, request_uri, request_method)
-        VALUES (#{userId}, #{username}, #{status}, #{deviceType}, #{loginIp}, #{ipType}, #{userAgent}, #{failReason}, #{requestUri}, #{requestMethod})
+        INSERT INTO login_log (user_id, owner_dept_id, username, status, device_type, login_ip, ip_type, user_agent, fail_reason, request_uri, request_method)
+        VALUES (#{userId}, #{ownerDepartmentId}, #{username}, #{status}, #{deviceType}, #{loginIp}, #{ipType}, #{userAgent}, #{failReason}, #{requestUri}, #{requestMethod})
     </insert>
 
     <sql id="filters">
@@ -48,6 +49,20 @@
             </if>
             <if test="endTime != null">
                 AND login_time &lt;= #{endTime}
+            </if>
+            <if test="scope != null and !scope.all">
+                AND <choose>
+                    <when test="scope.denied">1 = 0</when>
+                    <otherwise>(
+                        <if test="scope.departmentIds != null and !scope.departmentIds.isEmpty()">
+                            owner_dept_id IN <foreach collection="scope.departmentIds" item="deptId" open="(" separator="," close=")">#{deptId}</foreach>
+                        </if>
+                        <if test="scope.self">
+                            <if test="scope.departmentIds != null and !scope.departmentIds.isEmpty()"> OR </if>
+                            user_id = #{scope.userId}
+                        </if>
+                    )</otherwise>
+                </choose>
             </if>
         </where>
     </sql>

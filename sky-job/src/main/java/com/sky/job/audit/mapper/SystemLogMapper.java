@@ -1,6 +1,7 @@
 package com.sky.job.audit.mapper;
 
 import com.sky.job.audit.SystemLog;
+import com.sky.job.security.EffectiveDataScope;
 import org.apache.ibatis.annotations.Param;
 
 import java.time.LocalDateTime;
@@ -13,6 +14,7 @@ public interface SystemLogMapper {
             @Param("level") String level,
             @Param("status") String status,
             @Param("operatorUserId") String operatorUserId,
+            @Param("ownerDepartmentId") Long ownerDepartmentId,
             @Param("operatorName") String operatorName,
             @Param("sourceType") String sourceType,
             @Param("requestUri") String requestUri,
@@ -48,6 +50,7 @@ public interface SystemLogMapper {
             @Param("targetId") String targetId,
             @Param("startTime") LocalDateTime startTime,
             @Param("endTime") LocalDateTime endTime,
+            @Param("scope") EffectiveDataScope scope,
             @Param("limit") int limit,
             @Param("offset") int offset
     );
@@ -64,7 +67,8 @@ public interface SystemLogMapper {
             @Param("targetType") String targetType,
             @Param("targetId") String targetId,
             @Param("startTime") LocalDateTime startTime,
-            @Param("endTime") LocalDateTime endTime
+            @Param("endTime") LocalDateTime endTime,
+            @Param("scope") EffectiveDataScope scope
     );
 
     long countOlderThan(@Param("cutoff") LocalDateTime cutoff);

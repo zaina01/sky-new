@@ -7,6 +7,7 @@ import java.time.LocalDateTime;
 public record LoginLogResponse(
         Long id,
         String userId,
+        Long ownerDepartmentId,
         String username,
         String status,
         LocalDateTime loginTime,
@@ -23,6 +24,7 @@ public record LoginLogResponse(
         return new LoginLogResponse(
                 log.id(),
                 log.userId(),
+                log.ownerDepartmentId(),
                 log.username(),
                 log.status(),
                 log.loginTime(),

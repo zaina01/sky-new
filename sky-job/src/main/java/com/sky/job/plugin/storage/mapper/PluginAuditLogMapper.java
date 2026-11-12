@@ -8,6 +8,7 @@ import java.util.List;
 
 public interface PluginAuditLogMapper {
     int insert(
+            @Param("installationId") String installationId,
             @Param("pluginId") String pluginId,
             @Param("instanceId") String instanceId,
             @Param("actor") String actor,
@@ -16,6 +17,7 @@ public interface PluginAuditLogMapper {
     );
 
     List<PluginAuditLog> list(
+            @Param("installationId") String installationId,
             @Param("pluginId") String pluginId,
             @Param("instanceId") String instanceId,
             @Param("actor") String actor,
@@ -23,18 +25,21 @@ public interface PluginAuditLogMapper {
             @Param("action") String action,
             @Param("startTime") LocalDateTime startTime,
             @Param("endTime") LocalDateTime endTime,
+            @Param("scope") com.sky.job.security.EffectiveDataScope scope,
             @Param("limit") int limit,
             @Param("offset") int offset
     );
 
     long count(
+            @Param("installationId") String installationId,
             @Param("pluginId") String pluginId,
             @Param("instanceId") String instanceId,
             @Param("actor") String actor,
             @Param("actorLike") String actorLike,
             @Param("action") String action,
             @Param("startTime") LocalDateTime startTime,
-            @Param("endTime") LocalDateTime endTime
+            @Param("endTime") LocalDateTime endTime,
+            @Param("scope") com.sky.job.security.EffectiveDataScope scope
     );
 
     long countOlderThan(@Param("cutoff") LocalDateTime cutoff);

@@ -1,7 +1,10 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project version="4">
   <component name="SqlDialectMappings">
+    <file url="file://$PROJECT_DIR$/sql/add-plugin-account-groups-mysql.sql" dialect="MySQL" />
+    <file url="file://$PROJECT_DIR$/sql/add-plugin-account-list-preference-mysql.sql" dialect="MySQL" />
     <file url="file://$PROJECT_DIR$/sql/alter-plugin-runtime-remote-debug-mysql.sql" dialect="MySQL" />
     <file url="file://$PROJECT_DIR$/sql/schema-mysql.sql" dialect="MySQL" />
+    <file url="file://$PROJECT_DIR$/sql/upgrade-data-scope-plugin-installation-mysql.sql" dialect="MySQL" />
   </component>
 </project>

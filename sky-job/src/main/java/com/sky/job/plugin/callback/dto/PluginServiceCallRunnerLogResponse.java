@@ -2,6 +2,7 @@ package com.sky.job.plugin.callback.dto;
 
 public record PluginServiceCallRunnerLogResponse(
         long serviceCallLogId,
+        String targetInstallationId,
         String targetPluginId,
         String targetInstanceId,
         String runnerLogPath,

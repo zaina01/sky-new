@@ -46,11 +46,10 @@ public class PluginArtifactService {
         boolean overwriteDependencies = dependencyParser.hasDependencyDescriptor(storedArtifact.path());
         List<PluginDependencyDeclaration> declarations = overwriteDependencies ? dependencyParser.parse(storedArtifact.path()) : List.of();
         List<ResolvedPluginDependency> dependencies = overwriteDependencies ? dependencyResolver.resolve(declarations) : List.of();
-        String instanceId = registry.register(manifest, capabilities, storedArtifact.path(), storedArtifact.sha256(), dependencies, overwriteDependencies);
-        auditStore.insert(manifest.pluginId(), instanceId, actor, "PLUGIN_UPLOAD", "{\"sha256\":\"" + storedArtifact.sha256() + "\",\"dependencyDescriptor\":" + overwriteDependencies + ",\"declaredDependencies\":" + declarations.size() + ",\"resolvedDependencies\":" + dependencies.size() + "}");
+        registry.register(manifest, capabilities, storedArtifact.path(), storedArtifact.sha256(), dependencies, overwriteDependencies, actor);
+        auditStore.insert(manifest.pluginId(), "", actor, "PLUGIN_DEFINITION_UPLOAD", "{\"sha256\":\"" + storedArtifact.sha256() + "\",\"dependencyDescriptor\":" + overwriteDependencies + ",\"declaredDependencies\":" + declarations.size() + ",\"resolvedDependencies\":" + dependencies.size() + "}");
         return new PluginUploadResult(
                 manifest.pluginId(),
-                instanceId,
                 manifest.version(),
                 manifest.runtime().mainClass(),
                 storedArtifact.sha256(),

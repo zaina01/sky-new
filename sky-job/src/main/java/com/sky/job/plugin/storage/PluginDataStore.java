@@ -16,35 +16,35 @@ public class PluginDataStore {
         this.properties = properties;
     }
 
-    public void upsert(String pluginId, String collection, String dataKey, String dataJson) {
-        if (!exists(pluginId, collection, dataKey) && countRows(pluginId) >= properties.maxDataRowsPerPlugin()) {
+    public void upsert(String installationId, String collection, String dataKey, String dataJson) {
+        if (!exists(installationId, collection, dataKey) && countRows(installationId) >= properties.maxDataRowsPerPlugin()) {
             throw new IllegalStateException("Plugin data row quota exceeded");
         }
-        mapper.upsert(pluginId, collection, dataKey, dataJson);
+        mapper.upsert(installationId, collection, dataKey, dataJson);
     }
 
-    public boolean delete(String pluginId, String collection, String dataKey) {
-        return mapper.delete(pluginId, collection, dataKey) > 0;
+    public boolean delete(String installationId, String collection, String dataKey) {
+        return mapper.delete(installationId, collection, dataKey) > 0;
     }
 
-    public Optional<String> select(String pluginId, String collection, String dataKey) {
-        return Optional.ofNullable(mapper.select(pluginId, collection, dataKey));
+    public Optional<String> select(String installationId, String collection, String dataKey) {
+        return Optional.ofNullable(mapper.select(installationId, collection, dataKey));
     }
 
-    public int deleteByPluginId(String pluginId) {
-        return mapper.deleteByPluginId(pluginId);
+    public int deleteByInstallationId(String installationId) {
+        return mapper.deleteByInstallationId(installationId);
     }
 
-    public String selectAll(String pluginId, String collection) {
-        String value = mapper.selectAll(pluginId, collection, properties.selectAllLimit());
+    public String selectAll(String installationId, String collection) {
+        String value = mapper.selectAll(installationId, collection, properties.selectAllLimit());
         return value == null ? "[]" : value;
     }
 
-    private boolean exists(String pluginId, String collection, String dataKey) {
-        return mapper.countByKey(pluginId, collection, dataKey) > 0;
+    private boolean exists(String installationId, String collection, String dataKey) {
+        return mapper.countByKey(installationId, collection, dataKey) > 0;
     }
 
-    private int countRows(String pluginId) {
-        return mapper.countRows(pluginId);
+    private int countRows(String installationId) {
+        return mapper.countRows(installationId);
     }
 }

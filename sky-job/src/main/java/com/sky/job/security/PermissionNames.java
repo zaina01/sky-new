@@ -18,6 +18,10 @@ public final class PermissionNames {
     public static final String SYSTEM_RETENTION_CLEANUP = "system:retention:cleanup";
     public static final String SYSTEM_SETTING_READ = "system:setting:read";
     public static final String SYSTEM_SETTING_WRITE = "system:setting:write";
+    public static final String SYSTEM_DEPARTMENT_READ = "system:department:read";
+    public static final String SYSTEM_DEPARTMENT_WRITE = "system:department:write";
+    public static final String SYSTEM_DEPARTMENT_DELETE = "system:department:delete";
+    public static final String SYSTEM_DATA_OWNERSHIP_TRANSFER = "system:data-ownership:transfer";
     public static final String NOTIFICATION_CHANNEL_READ = "notification:channel:read";
     public static final String NOTIFICATION_CHANNEL_WRITE = "notification:channel:write";
     public static final String NOTIFICATION_CHANNEL_TEST = "notification:channel:test";
@@ -35,12 +39,14 @@ public final class PermissionNames {
     public static final String PLUGIN_AUDIT_READ = "plugin:audit:read";
     public static final String PLUGIN_SERVICE_PERMISSION_READ = "plugin:service-permission:read";
     public static final String PLUGIN_SERVICE_PERMISSION_WRITE = "plugin:service-permission:write";
+    public static final String PLUGIN_NOTIFICATION_CHANNEL_BIND = "plugin:notification-channel:bind";
     public static final String JOB_READ = "job:read";
     public static final String JOB_WRITE = "job:write";
     public static final String JOB_DELETE = "job:delete";
     public static final String JOB_RUN = "job:run";
     public static final String JOB_EXECUTION_READ = "job:execution:read";
     public static final String JOB_EXECUTION_CANCEL = "job:execution:cancel";
+    public static final String JOB_NOTIFICATION_BIND = "job:notification:bind";
 
     private PermissionNames() {
     }

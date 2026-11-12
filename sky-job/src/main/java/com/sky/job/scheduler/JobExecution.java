@@ -5,6 +5,7 @@ import java.time.LocalDateTime;
 public record JobExecution(
         long id,
         long jobId,
+        String pluginInstallationId,
         String pluginId,
         String instanceId,
         String requestId,
@@ -19,6 +20,8 @@ public record JobExecution(
         String errorType,
         String errorMessage,
         String runnerLogPath,
+        String ownerUserId,
+        Long ownerDepartmentId,
         LocalDateTime createdAt
 ) {
 }

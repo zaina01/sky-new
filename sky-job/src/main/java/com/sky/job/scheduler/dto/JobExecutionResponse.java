@@ -9,6 +9,7 @@ import java.time.LocalDateTime;
 public record JobExecutionResponse(
         long id,
         long jobId,
+        String pluginInstallationId,
         String pluginId,
         String instanceId,
         String requestId,
@@ -23,12 +24,15 @@ public record JobExecutionResponse(
         String errorType,
         String errorMessage,
         String runnerLogPath,
+        String ownerUserId,
+        Long ownerDepartmentId,
         LocalDateTime createdAt
 ) {
     public static JobExecutionResponse from(JobExecution execution) {
         return new JobExecutionResponse(
                 execution.id(),
                 execution.jobId(),
+                execution.pluginInstallationId(),
                 execution.pluginId(),
                 execution.instanceId(),
                 execution.requestId(),
@@ -43,6 +47,8 @@ public record JobExecutionResponse(
                 execution.errorType(),
                 execution.errorMessage(),
                 execution.runnerLogPath(),
+                execution.ownerUserId(),
+                execution.ownerDepartmentId(),
                 execution.createdAt()
         );
     }

@@ -81,23 +81,23 @@ public class ServicePluginIdleRuntimeReaper {
 
     private void tryStopIdle(PluginRuntimeHandle handle, Instant now, Duration idleTimeout) {
         if (runtimeAdapter.inspect(handle) != PluginRuntimeState.RUNNING) {
-            registry.remove(handle.pluginId());
-            idleTracker.remove(handle.pluginId());
+            registry.remove(handle.installationId());
+            idleTracker.remove(handle.installationId());
             return;
         }
-        PluginRuntimeRecord record = runtimeStore.findRuntimeByPluginId(handle.pluginId()).orElse(null);
+        PluginRuntimeRecord record = runtimeStore.findRuntimeByInstallationId(handle.installationId()).orElse(null);
         if (record == null || !runtimeStore.runtimeCapabilities(record.capabilitiesJson()).contains(PluginCapability.SERVICE)) {
             return;
         }
-        Instant lastCalledAt = idleTracker.lastCalledAt(handle.pluginId()).orElse(null);
+        Instant lastCalledAt = idleTracker.lastCalledAt(handle.installationId()).orElse(null);
         if (lastCalledAt == null || Duration.between(lastCalledAt, now).compareTo(idleTimeout) < 0) {
             return;
         }
-        registry.remove(handle.pluginId()).ifPresent(runtimeHandle -> {
-            log.info("Stopping idle service plugin runtime: pluginId={}, instanceId={}, idleMillis={}", runtimeHandle.pluginId(), runtimeHandle.instanceId(), Duration.between(lastCalledAt, now).toMillis());
+        registry.remove(handle.installationId()).ifPresent(runtimeHandle -> {
+            log.info("Stopping idle service plugin runtime: installationId={}, pluginId={}, instanceId={}, idleMillis={}", runtimeHandle.installationId(), runtimeHandle.pluginId(), runtimeHandle.instanceId(), Duration.between(lastCalledAt, now).toMillis());
             runtimeAdapter.stop(runtimeHandle, runtimeSettings.stopTimeout());
-            idleTracker.remove(runtimeHandle.pluginId());
-            runtimeStore.updateLifecycle(runtimeHandle.pluginId(), PluginRuntimeState.STOPPED, record.runnerHost(), null, record.workDir() == null || record.workDir().isBlank() ? null : java.nio.file.Path.of(record.workDir()));
+            idleTracker.remove(runtimeHandle.installationId());
+            runtimeStore.updateLifecycle(runtimeHandle.installationId(), PluginRuntimeState.STOPPED, record.runnerHost(), null, record.workDir() == null || record.workDir().isBlank() ? null : java.nio.file.Path.of(record.workDir()));
         });
     }
 

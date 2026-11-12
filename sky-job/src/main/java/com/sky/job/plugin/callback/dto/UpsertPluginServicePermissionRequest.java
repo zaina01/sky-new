@@ -1,8 +1,8 @@
 package com.sky.job.plugin.callback.dto;
 
 public record UpsertPluginServicePermissionRequest(
-        String callerPluginId,
-        String targetPluginId,
+        String callerInstallationId,
+        String targetInstallationId,
         String operation,
         Boolean enabled
 ) {

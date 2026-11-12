@@ -4,12 +4,8 @@
         "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="com.sky.job.scheduler.mapper.JobExecutionMapper">
     <resultMap id="StatusCountRowResultMap" type="com.sky.job.common.mapper.StatusCountRow">
-        <constructor>
-            <arg column="status" javaType="java.lang.String"/>
-            <arg column="total" javaType="_long"/>
-        </constructor>
+        <constructor><arg column="status" javaType="java.lang.String"/><arg column="total" javaType="_long"/></constructor>
     </resultMap>
-
     <resultMap id="DailyStatusCountRowResultMap" type="com.sky.job.common.mapper.DailyStatusCountRow">
         <constructor>
             <arg column="bucket_date" javaType="java.time.LocalDate"/>
@@ -17,11 +13,11 @@
             <arg column="total" javaType="_long"/>
         </constructor>
     </resultMap>
-
     <resultMap id="JobExecutionRowResultMap" type="com.sky.job.scheduler.mapper.JobExecutionRow">
         <constructor>
             <arg column="id" javaType="_long"/>
             <arg column="job_id" javaType="_long"/>
+            <arg column="plugin_installation_id" javaType="java.lang.String"/>
             <arg column="plugin_id" javaType="java.lang.String"/>
             <arg column="instance_id" javaType="java.lang.String"/>
             <arg column="request_id" javaType="java.lang.String"/>
@@ -36,118 +32,108 @@
             <arg column="error_type" javaType="java.lang.String"/>
             <arg column="error_message" javaType="java.lang.String"/>
             <arg column="runner_log_path" javaType="java.lang.String"/>
+            <arg column="owner_user_id" javaType="java.lang.String"/>
+            <arg column="owner_dept_id" javaType="java.lang.Long"/>
             <arg column="created_at" javaType="java.time.LocalDateTime"/>
         </constructor>
     </resultMap>
 
+    <sql id="scope">
+        <if test="scope != null and !scope.all">
+            AND <choose>
+                <when test="scope.denied">1 = 0</when>
+                <otherwise>(
+                    <if test="scope.departmentIds != null and !scope.departmentIds.isEmpty()">
+                        e.owner_dept_id IN <foreach collection="scope.departmentIds" item="deptId" open="(" separator="," close=")">#{deptId}</foreach>
+                    </if>
+                    <if test="scope.self">
+                        <if test="scope.departmentIds != null and !scope.departmentIds.isEmpty()"> OR </if>
+                        e.owner_user_id = #{scope.userId}
+                    </if>
+                )</otherwise>
+            </choose>
+        </if>
+    </sql>
+
     <insert id="insertRunning" useGeneratedKeys="true" keyProperty="id">
-        INSERT INTO job_execution (job_id, plugin_id, instance_id, status, trigger_type, job_name, runner_log_path)
-        VALUES (#{jobId}, #{pluginId}, #{instanceId}, #{status}, #{triggerType}, #{jobName}, #{runnerLogPath})
+        INSERT INTO job_execution (
+            job_id, plugin_installation_id, plugin_id, instance_id, status, trigger_type,
+            job_name, runner_log_path, owner_user_id, owner_dept_id
+        ) VALUES (
+            #{jobId}, #{pluginInstallationId}, #{pluginId}, #{instanceId}, #{status}, #{triggerType},
+            #{jobName}, #{runnerLogPath}, #{ownerUserId}, #{ownerDepartmentId}
+        )
     </insert>
-
     <update id="updateRequestId">UPDATE job_execution SET request_id = #{requestId} WHERE id = #{id}</update>
-
     <update id="markTerminal">
-        UPDATE job_execution
-        SET status = #{status}, message = #{message}, result_json = CAST(#{resultJson} AS JSON), error_type = #{errorType}, error_message = #{errorMessage}, finished_at = #{finishedAt}, duration_millis = #{durationMillis}
-        WHERE id = #{id}
+        UPDATE job_execution SET status=#{status}, message=#{message}, result_json=CAST(#{resultJson} AS JSON),
+            error_type=#{errorType}, error_message=#{errorMessage}, finished_at=#{finishedAt}, duration_millis=#{durationMillis}
+        WHERE id=#{id}
     </update>
-
     <update id="markTerminalIfRunning">
-        UPDATE job_execution
-        SET status = #{status}, message = #{message}, result_json = CAST(#{resultJson} AS JSON), error_type = #{errorType}, error_message = #{errorMessage}, finished_at = #{finishedAt}, duration_millis = #{durationMillis}
-        WHERE id = #{id} AND status = #{runningStatus}
+        UPDATE job_execution SET status=#{status}, message=#{message}, result_json=CAST(#{resultJson} AS JSON),
+            error_type=#{errorType}, error_message=#{errorMessage}, finished_at=#{finishedAt}, duration_millis=#{durationMillis}
+        WHERE id=#{id} AND status=#{runningStatus}
     </update>
-
     <update id="markCancelledIfRunning">
-        UPDATE job_execution
-        SET status = #{cancelledStatus}, message = #{message}, result_json = CAST('{}' AS JSON), error_type = #{errorType}, error_message = NULL, finished_at = #{finishedAt}, duration_millis = #{durationMillis}
-        WHERE id = #{id} AND status = #{runningStatus}
+        UPDATE job_execution SET status=#{cancelledStatus}, message=#{message}, result_json=CAST('{}' AS JSON),
+            error_type=#{errorType}, error_message=NULL, finished_at=#{finishedAt}, duration_millis=#{durationMillis}
+        WHERE id=#{id} AND status=#{runningStatus}
     </update>
-
     <update id="markSystemExitForRunning">
-        UPDATE job_execution
-        SET status = #{systemExitStatus}, finished_at = CURRENT_TIMESTAMP(3), message = 'Host restarted while job was running'
-        WHERE status = #{runningStatus}
+        UPDATE job_execution SET status=#{systemExitStatus}, finished_at=CURRENT_TIMESTAMP(3),
+            message='Host restarted while job was running' WHERE status=#{runningStatus}
     </update>
 
     <select id="countOlderThan" resultType="long">
-        SELECT COUNT(*)
-        FROM job_execution
-        WHERE finished_at &lt; #{cutoff} AND status &lt;&gt; #{runningStatus}
+        SELECT COUNT(*) FROM job_execution WHERE finished_at &lt; #{cutoff} AND status &lt;&gt; #{runningStatus}
     </select>
-
     <delete id="deleteOlderThan">
-        DELETE FROM job_execution
-        WHERE finished_at &lt; #{cutoff} AND status &lt;&gt; #{runningStatus}
-        ORDER BY id
-        LIMIT #{limit}
+        DELETE FROM job_execution WHERE finished_at &lt; #{cutoff} AND status &lt;&gt; #{runningStatus}
+        ORDER BY id LIMIT #{limit}
     </delete>
-
     <select id="countRunningByJobId" resultType="int">
-        SELECT COUNT(*)
-        FROM job_execution
-        WHERE job_id = #{jobId} AND status = #{runningStatus}
+        SELECT COUNT(*) FROM job_execution WHERE job_id=#{jobId} AND status=#{runningStatus}
     </select>
+    <delete id="deleteByJobId">DELETE FROM job_execution WHERE job_id=#{jobId}</delete>
 
-    <delete id="deleteByJobId">
-        DELETE FROM job_execution
-        WHERE job_id = #{jobId}
-    </delete>
-
-    <select id="findById" resultMap="JobExecutionRowResultMap">SELECT * FROM job_execution WHERE id = #{id}</select>
+    <select id="findById" resultMap="JobExecutionRowResultMap">
+        SELECT e.* FROM job_execution e <where>e.id=#{id}<include refid="scope"/></where>
+    </select>
+    <select id="findByIdUnscoped" resultMap="JobExecutionRowResultMap">
+        SELECT e.* FROM job_execution e WHERE e.id=#{id}
+    </select>
 
     <sql id="filters">
-        <where>
-            <if test="jobId != null">
-                job_id = #{jobId}
-            </if>
-            <if test="pluginId != null and pluginId != ''">
-                AND plugin_id = #{pluginId}
-            </if>
-            <if test="status != null">
-                AND status = #{status}
-            </if>
-        </where>
+        <if test="jobId != null">AND e.job_id=#{jobId}</if>
+        <if test="pluginInstallationId != null and pluginInstallationId != ''">AND e.plugin_installation_id=#{pluginInstallationId}</if>
+        <if test="pluginId != null and pluginId != ''">AND e.plugin_id=#{pluginId}</if>
+        <if test="status != null">AND e.status=#{status}</if>
+        <include refid="scope"/>
     </sql>
-
     <select id="list" resultMap="JobExecutionRowResultMap">
-        SELECT *
-        FROM job_execution
-        <include refid="filters"/>
-        ORDER BY id DESC
-        LIMIT #{limit} OFFSET #{offset}
+        SELECT e.* FROM job_execution e <where><include refid="filters"/></where>
+        ORDER BY e.id DESC LIMIT #{limit} OFFSET #{offset}
     </select>
-
     <select id="count" resultType="long">
-        SELECT COUNT(*)
-        FROM job_execution
-        <include refid="filters"/>
+        SELECT COUNT(*) FROM job_execution e <where><include refid="filters"/></where>
     </select>
-
     <select id="countByStatusBetween" resultMap="StatusCountRowResultMap">
-        SELECT status AS status, COUNT(*) AS total
-        FROM job_execution
-        WHERE started_at &gt;= #{startTime} AND started_at &lt; #{endTime}
-        GROUP BY status
+        SELECT e.status AS status, COUNT(*) AS total FROM job_execution e
+        <where>e.started_at &gt;= #{startTime} AND e.started_at &lt; #{endTime}<include refid="scope"/></where>
+        GROUP BY e.status
     </select>
-
     <select id="countDailyByStatus" resultMap="DailyStatusCountRowResultMap">
-        SELECT DATE(started_at) AS bucket_date, status AS status, COUNT(*) AS total
-        FROM job_execution
-        WHERE started_at &gt;= #{startTime} AND started_at &lt; #{endTime}
-        GROUP BY DATE(started_at), status
-        ORDER BY bucket_date ASC, status ASC
+        SELECT DATE(e.started_at) AS bucket_date, e.status AS status, COUNT(*) AS total FROM job_execution e
+        <where>e.started_at &gt;= #{startTime} AND e.started_at &lt; #{endTime}<include refid="scope"/></where>
+        GROUP BY DATE(e.started_at), e.status ORDER BY bucket_date ASC, status ASC
     </select>
-
     <select id="listRecentFailures" resultMap="JobExecutionRowResultMap">
-        SELECT *
-        FROM job_execution
-        WHERE status IN
-        <foreach collection="statuses" item="status" open="(" separator="," close=")">
-            #{status}
-        </foreach>
-        ORDER BY started_at DESC, id DESC
-        LIMIT #{limit}
+        SELECT e.* FROM job_execution e
+        <where>
+            e.status IN <foreach collection="statuses" item="status" open="(" separator="," close=")">#{status}</foreach>
+            <include refid="scope"/>
+        </where>
+        ORDER BY e.started_at DESC, e.id DESC LIMIT #{limit}
     </select>
 </mapper>

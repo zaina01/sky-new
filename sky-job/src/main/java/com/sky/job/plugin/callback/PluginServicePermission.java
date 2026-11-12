@@ -4,7 +4,9 @@ import java.time.LocalDateTime;
 
 public record PluginServicePermission(
         long id,
+        String callerInstallationId,
         String callerPluginId,
+        String targetInstallationId,
         String targetPluginId,
         String operation,
         boolean enabled,

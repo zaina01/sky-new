@@ -1,6 +1,8 @@
 package com.sky.job.plugin.runtime;
 
 import com.sky.job.plugin.runtime.dto.PluginRuntimeResponse;
+import com.sky.job.plugin.runtime.dto.CreatePluginInstallationRequest;
+import com.sky.job.plugin.runtime.dto.ReplaceNotificationChannelsRequest;
 import com.sky.job.plugin.runtime.dto.UpdatePluginRuntimeDebugRequest;
 import com.sky.job.scheduler.dto.PageResponse;
 import com.sky.job.security.AuthenticatedUser;
@@ -16,9 +18,11 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.Map;
+import java.util.List;
+import jakarta.validation.Valid;
 
 @RestController
-@RequestMapping("/plugins/runtimes")
+@RequestMapping("/plugins/installations")
 public class PluginRuntimeController {
     private final PluginRuntimeService runtimeService;
 
@@ -30,44 +34,67 @@ public class PluginRuntimeController {
     public PageResponse<PluginRuntimeResponse> list(
             @RequestParam(required = false) String pluginId,
             @RequestParam(required = false) PluginRuntimeState state,
+            @AuthenticationPrincipal AuthenticatedUser user,
             @RequestParam(required = false) Integer page,
             @RequestParam(required = false) Integer size
     ) {
-        return runtimeService.list(pluginId, state, page, size);
+        return runtimeService.list(pluginId, state, user, page, size);
     }
 
-    @GetMapping("/{pluginId}")
-    public PluginRuntimeResponse detail(@PathVariable String pluginId) {
-        return runtimeService.detail(pluginId);
+    @PostMapping
+    public PluginRuntimeResponse create(@Valid @RequestBody CreatePluginInstallationRequest request, @AuthenticationPrincipal AuthenticatedUser user) {
+        return runtimeService.create(request, user);
     }
 
-    @PostMapping("/{pluginId}/start")
-    public PluginRuntimeResponse start(@PathVariable String pluginId, @AuthenticationPrincipal AuthenticatedUser user) {
-        return runtimeService.start(pluginId, user.username());
+    @GetMapping("/{installationId}")
+    public PluginRuntimeResponse detail(@PathVariable String installationId, @AuthenticationPrincipal AuthenticatedUser user) {
+        return runtimeService.detail(installationId, user);
     }
 
-    @PostMapping("/{pluginId}/stop")
-    public PluginRuntimeResponse stop(@PathVariable String pluginId, @AuthenticationPrincipal AuthenticatedUser user) {
-        return runtimeService.stop(pluginId, user.username());
+    @PostMapping("/{installationId}/start")
+    public PluginRuntimeResponse start(@PathVariable String installationId, @AuthenticationPrincipal AuthenticatedUser user) {
+        return runtimeService.start(installationId, user);
     }
 
-    @PostMapping("/{pluginId}/restart")
-    public PluginRuntimeResponse restart(@PathVariable String pluginId, @AuthenticationPrincipal AuthenticatedUser user) {
-        return runtimeService.restart(pluginId, user.username());
+    @PostMapping("/{installationId}/stop")
+    public PluginRuntimeResponse stop(@PathVariable String installationId, @AuthenticationPrincipal AuthenticatedUser user) {
+        return runtimeService.stop(installationId, user);
     }
 
-    @PutMapping("/{pluginId}/debug")
+    @PostMapping("/{installationId}/restart")
+    public PluginRuntimeResponse restart(@PathVariable String installationId, @AuthenticationPrincipal AuthenticatedUser user) {
+        return runtimeService.restart(installationId, user);
+    }
+
+    @PutMapping("/{installationId}/debug")
     public PluginRuntimeResponse updateDebug(
-            @PathVariable String pluginId,
+            @PathVariable String installationId,
             @RequestBody(required = false) UpdatePluginRuntimeDebugRequest request,
             @AuthenticationPrincipal AuthenticatedUser user
     ) {
-        return runtimeService.updateDebug(pluginId, request, user.username());
+        return runtimeService.updateDebug(installationId, request, user);
     }
 
-    @DeleteMapping("/{pluginId}")
-    public Map<String, Boolean> uninstall(@PathVariable String pluginId, @AuthenticationPrincipal AuthenticatedUser user) {
-        runtimeService.uninstall(pluginId, user.username());
+    @PutMapping("/{installationId}/notification-channels")
+    public List<String> replaceNotificationChannels(
+            @PathVariable String installationId,
+            @Valid @RequestBody ReplaceNotificationChannelsRequest request,
+            @AuthenticationPrincipal AuthenticatedUser user
+    ) {
+        return runtimeService.replaceNotificationChannels(installationId, request, user);
+    }
+
+    @GetMapping("/{installationId}/notification-channels")
+    public List<String> notificationChannelIds(
+            @PathVariable String installationId,
+            @AuthenticationPrincipal AuthenticatedUser user
+    ) {
+        return runtimeService.notificationChannelIds(installationId, user);
+    }
+
+    @DeleteMapping("/{installationId}")
+    public Map<String, Boolean> uninstall(@PathVariable String installationId, @AuthenticationPrincipal AuthenticatedUser user) {
+        runtimeService.uninstall(installationId, user);
         return Map.of("success", true);
     }
 }

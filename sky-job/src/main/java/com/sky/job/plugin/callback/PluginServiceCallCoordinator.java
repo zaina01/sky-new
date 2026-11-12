@@ -11,12 +11,15 @@ import com.sky.job.plugin.runtime.process.ProcessPluginRuntimeProperties;
 import com.sky.job.plugin.security.PluginCapability;
 import com.sky.job.plugin.security.PluginRuntimePrincipal;
 import com.sky.job.plugin.storage.PluginAuditStore;
+import com.sky.job.scheduler.JobExecution;
+import com.sky.job.scheduler.JobExecutionStore;
 import com.sky.job.scheduler.PluginRuntimeMetadataStore;
 import com.sky.plugin.protocol.PluginServiceCallRequest;
 import com.sky.plugin.protocol.PluginServiceCallResponse;
 import com.sky.plugin.protocol.PluginServiceRunRequest;
 import com.sky.plugin.protocol.PluginServiceRunResponse;
 import io.grpc.Status;
+import io.grpc.StatusRuntimeException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -24,6 +27,7 @@ import org.springframework.stereotype.Service;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.regex.Pattern;
@@ -36,6 +40,7 @@ public class PluginServiceCallCoordinator {
     private static final int MAX_RESPONSE_BYTES = 1024 * 1024;
 
     private final PluginRuntimeMetadataStore runtimeStore;
+    private final JobExecutionStore executionStore;
     private final PluginRuntimeService runtimeService;
     private final PluginTaskInvoker taskInvoker;
     private final PluginServicePermissionStore permissionStore;
@@ -47,6 +52,7 @@ public class PluginServiceCallCoordinator {
 
     public PluginServiceCallCoordinator(
             PluginRuntimeMetadataStore runtimeStore,
+            JobExecutionStore executionStore,
             PluginRuntimeService runtimeService,
             PluginTaskInvoker taskInvoker,
             PluginServicePermissionStore permissionStore,
@@ -57,6 +63,7 @@ public class PluginServiceCallCoordinator {
             ProcessPluginRuntimeProperties runtimeProperties
     ) {
         this.runtimeStore = runtimeStore;
+        this.executionStore = executionStore;
         this.runtimeService = runtimeService;
         this.taskInvoker = taskInvoker;
         this.permissionStore = permissionStore;
@@ -70,31 +77,37 @@ public class PluginServiceCallCoordinator {
     public PluginServiceCallResponse call(PluginRuntimePrincipal principal, PluginServiceCallRequest request) {
         long startedAt = System.currentTimeMillis();
         String serviceRequestId = UUID.randomUUID().toString();
-        String callerPluginId = principal.pluginId();
-        String targetPluginId = safe(request.getTargetPluginId());
+        PluginRuntimeRecord caller = null;
+        PluginRuntimeRecord target = null;
+        String requestedTargetPluginId = safe(request.getTargetPluginId());
+        String requestedTargetInstallationId = safe(request.getTargetInstallationId());
         String operation = safe(request.getOperation());
         long timeoutMillis = timeoutMillis(request.getTimeoutMillis());
+        String normalizedRequestJson = request.getRequestJson();
         try {
             validatePrincipal(principal, request);
-            validateName(targetPluginId, "Invalid target plugin id");
+            caller = callerRuntime(principal);
             validateName(operation, "Invalid plugin service operation");
-            String requestJson = normalizeJson(request.getRequestJson(), MAX_REQUEST_BYTES);
-            PluginRuntimeRecord target = runtimeStore.findRuntimeByPluginId(targetPluginId).orElseThrow(() -> Status.NOT_FOUND.withDescription("Target plugin runtime not found").asRuntimeException());
+            normalizedRequestJson = normalizeJson(request.getRequestJson(), MAX_REQUEST_BYTES);
+            target = resolveTarget(principal.installationId(), requestedTargetInstallationId, requestedTargetPluginId, operation);
             if (!runtimeStore.runtimeCapabilities(target.capabilitiesJson()).contains(PluginCapability.SERVICE)) {
                 throw Status.PERMISSION_DENIED.withDescription("Target plugin does not support service calls").asRuntimeException();
             }
-            if (!permissionStore.isAllowed(callerPluginId, targetPluginId, operation)) {
+            if (!permissionStore.isAllowed(principal.installationId(), target.installationId(), operation)) {
                 throw Status.PERMISSION_DENIED.withDescription("Plugin service call is not allowed").asRuntimeException();
             }
-            PluginRuntimeHandle handle = runtimeService.ensureRunningHandle(targetPluginId, "plugin:" + callerPluginId);
-            servicePluginIdleTracker.markCalled(targetPluginId);
+
+            PluginRuntimeHandle handle = runtimeService.ensureRunningHandle(target.installationId(), "plugin:" + principal.installationId());
+            servicePluginIdleTracker.markCalled(target.installationId());
             String targetRunnerLogPath = handle.logPath().toAbsolutePath().normalize().toString();
             PluginServiceRunResponse serviceResponse = taskInvoker.callService(handle, PluginServiceRunRequest.newBuilder()
                     .setRequestId(serviceRequestId)
-                    .setCallerPluginId(callerPluginId)
-                    .setTargetPluginId(targetPluginId)
+                    .setCallerInstallationId(principal.installationId())
+                    .setCallerPluginId(principal.pluginId())
+                    .setTargetInstallationId(target.installationId())
+                    .setTargetPluginId(target.pluginId())
                     .setOperation(operation)
-                    .setRequestJson(requestJson)
+                    .setRequestJson(normalizedRequestJson)
                     .setTimeoutMillis(timeoutMillis)
                     .build(), Duration.ofMillis(timeoutMillis));
             validateSize(serviceResponse.getResultJson(), MAX_RESPONSE_BYTES, "Plugin service response is too large");
@@ -105,20 +118,81 @@ public class PluginServiceCallCoordinator {
                     .setErrorType(serviceResponse.getErrorType())
                     .setErrorMessage(serviceResponse.getErrorMessage())
                     .build();
-            recordCallLog(request, callerPluginId, principal.instanceId(), targetPluginId, handle.instanceId(), operation, serviceRequestId, targetRunnerLogPath, timeoutMillis, requestJson, response.getResultJson(), response.getSuccess(), response.getErrorType(), response.getErrorMessage(), startedAt);
-            audit(callerPluginId, principal.instanceId(), targetPluginId, operation, request.getRequestId(), serviceRequestId, timeoutMillis, requestJson, response.getResultJson(), response.getSuccess(), response.getErrorType(), startedAt);
+            recordCallLog(principal, request, caller, target, handle.instanceId(), operation, serviceRequestId, targetRunnerLogPath,
+                    timeoutMillis, normalizedRequestJson, response.getResultJson(), response.getSuccess(), response.getErrorType(), response.getErrorMessage(), startedAt);
+            audit(principal, target, operation, request.getRequestId(), serviceRequestId, timeoutMillis, normalizedRequestJson,
+                    response.getResultJson(), response.getSuccess(), response.getErrorType(), startedAt);
             return response;
         } catch (RuntimeException exception) {
-            PluginServiceCallResponse response = PluginServiceCallResponse.newBuilder()
+            recordCallLog(principal, request, caller, target, "", operation, serviceRequestId, "", timeoutMillis,
+                    normalizedRequestJson, "", false, exception.getClass().getName(), errorMessage(exception), startedAt);
+            audit(principal, target, operation, request.getRequestId(), serviceRequestId, timeoutMillis, normalizedRequestJson,
+                    "", false, exception.getClass().getName(), startedAt);
+            if (exception instanceof StatusRuntimeException statusRuntimeException) {
+                throw statusRuntimeException;
+            }
+            return PluginServiceCallResponse.newBuilder()
                     .setSuccess(false)
                     .setMessage("Plugin service call failed")
                     .setErrorType(exception.getClass().getName())
-                    .setErrorMessage(exception.getMessage() == null ? "" : exception.getMessage())
+                    .setErrorMessage(errorMessage(exception))
                     .build();
-            recordCallLog(request, callerPluginId, principal.instanceId(), targetPluginId, "", operation, serviceRequestId, "", timeoutMillis, request.getRequestJson(), "", false, exception.getClass().getName(), response.getErrorMessage(), startedAt);
-            audit(callerPluginId, principal.instanceId(), targetPluginId, operation, request.getRequestId(), serviceRequestId, timeoutMillis, request.getRequestJson(), "", false, exception.getClass().getName(), startedAt);
-            return response;
         }
+    }
+
+    private PluginRuntimeRecord callerRuntime(PluginRuntimePrincipal principal) {
+        PluginRuntimeRecord caller = runtimeStore.findRuntimeByInstallationId(principal.installationId())
+                .orElseThrow(() -> Status.PERMISSION_DENIED.withDescription("Caller plugin installation is not available").asRuntimeException());
+        if (!caller.pluginId().equals(principal.pluginId())) {
+            throw Status.PERMISSION_DENIED.withDescription("Caller plugin runtime identity mismatch").asRuntimeException();
+        }
+        Long executionId = principal.executionId();
+        if (executionId == null) {
+            throw Status.PERMISSION_DENIED.withDescription("Caller execution context is not available").asRuntimeException();
+        }
+        JobExecution execution = executionStore.findByIdUnscoped(executionId)
+                .orElseThrow(() -> Status.PERMISSION_DENIED.withDescription("Caller execution context is not available").asRuntimeException());
+        if (execution.jobId() != principal.jobId()
+                || !execution.pluginInstallationId().equals(principal.installationId())
+                || !execution.pluginId().equals(principal.pluginId())
+                || !execution.instanceId().equals(principal.instanceId())) {
+            throw Status.PERMISSION_DENIED.withDescription("Caller plugin runtime identity mismatch").asRuntimeException();
+        }
+        return caller;
+    }
+
+    private PluginRuntimeRecord resolveTarget(
+            String callerInstallationId,
+            String targetInstallationId,
+            String targetPluginId,
+            String operation
+    ) {
+        if (!targetInstallationId.isBlank()) {
+            validateName(targetInstallationId, "Invalid target installation id");
+            if (!permissionStore.isAllowed(callerInstallationId, targetInstallationId, operation)) {
+                throw Status.PERMISSION_DENIED.withDescription("Plugin service call is not allowed").asRuntimeException();
+            }
+            PluginRuntimeRecord target = runtimeStore.findRuntimeByInstallationId(targetInstallationId)
+                    .orElseThrow(() -> Status.NOT_FOUND.withDescription("Target plugin installation not found").asRuntimeException());
+            if (!targetPluginId.isBlank() && !target.pluginId().equals(targetPluginId)) {
+                throw Status.PERMISSION_DENIED.withDescription("Target plugin identity mismatch").asRuntimeException();
+            }
+            return target;
+        }
+
+        validateName(targetPluginId, "Invalid target plugin id");
+        List<String> matches = permissionStore.authorizedTargetInstallationIds(callerInstallationId, targetPluginId, operation)
+                .stream().distinct().toList();
+        if (matches.isEmpty()) {
+            throw Status.PERMISSION_DENIED.withDescription("Plugin service call is not allowed").asRuntimeException();
+        }
+        if (matches.size() != 1) {
+            throw Status.FAILED_PRECONDITION
+                    .withDescription("Multiple authorized target installations match; targetInstallationId is required")
+                    .asRuntimeException();
+        }
+        return runtimeStore.findRuntimeByInstallationId(matches.getFirst())
+                .orElseThrow(() -> Status.NOT_FOUND.withDescription("Target plugin installation not found").asRuntimeException());
     }
 
     private void validatePrincipal(PluginRuntimePrincipal principal, PluginServiceCallRequest request) {
@@ -129,8 +203,11 @@ public class PluginServiceCallCoordinator {
         if (!principal.hasCapability(PluginCapability.TASK) && !principal.hasCapability(PluginCapability.SERVICE)) {
             throw Status.PERMISSION_DENIED.withDescription("Plugin service caller capability required").asRuntimeException();
         }
-        if (safe(request.getJobId()).isBlank()) {
+        if (!principal.taskBound()) {
             throw Status.PERMISSION_DENIED.withDescription("Nested plugin service calls are not allowed").asRuntimeException();
+        }
+        if (!Long.toString(principal.jobId()).equals(safe(request.getJobId()))) {
+            throw Status.PERMISSION_DENIED.withDescription("Job context mismatch").asRuntimeException();
         }
     }
 
@@ -153,7 +230,7 @@ public class PluginServiceCallCoordinator {
     }
 
     private void validateSize(String value, int maxBytes, String message) {
-        if ((value == null ? "" : value).getBytes(StandardCharsets.UTF_8).length > maxBytes) {
+        if (bytes(value) > maxBytes) {
             throw Status.INVALID_ARGUMENT.withDescription(message).asRuntimeException();
         }
     }
@@ -161,20 +238,40 @@ public class PluginServiceCallCoordinator {
     private long timeoutMillis(long requested) {
         long defaultTimeoutMillis = runtimeProperties.serviceCallTimeout().toMillis();
         long maxTimeoutMillis = runtimeProperties.maxServiceCallTimeout().toMillis();
-        if (requested <= 0) {
-            return defaultTimeoutMillis;
-        }
-        return Math.min(requested, maxTimeoutMillis);
+        return requested <= 0 ? defaultTimeoutMillis : Math.min(requested, maxTimeoutMillis);
     }
 
-    private void recordCallLog(PluginServiceCallRequest request, String callerPluginId, String callerInstanceId, String targetPluginId, String targetInstanceId, String operation, String serviceRequestId, String targetRunnerLogPath, long timeoutMillis, String requestJson, String responseJson, boolean success, String errorType, String errorMessage, long startedAt) {
+    private void recordCallLog(
+            PluginRuntimePrincipal principal,
+            PluginServiceCallRequest request,
+            PluginRuntimeRecord caller,
+            PluginRuntimeRecord target,
+            String targetInstanceId,
+            String operation,
+            String serviceRequestId,
+            String targetRunnerLogPath,
+            long timeoutMillis,
+            String requestJson,
+            String responseJson,
+            boolean success,
+            String errorType,
+            String errorMessage,
+            long startedAt
+    ) {
         try {
             callLogStore.insert(new PluginServiceCallLogCommand(
-                    jobId(request.getJobId()),
-                    safeValue(callerPluginId),
-                    safeValue(callerInstanceId),
+                    principal.jobId(),
+                    principal.executionId(),
+                    principal.installationId(),
+                    principal.pluginId(),
+                    caller == null ? null : caller.ownerUserId(),
+                    caller == null ? null : caller.ownerDepartmentId(),
+                    principal.instanceId(),
                     safeValue(request.getRequestId()),
-                    safeValue(targetPluginId),
+                    target == null ? null : target.installationId(),
+                    target == null ? nullable(request.getTargetPluginId()) : target.pluginId(),
+                    target == null ? null : target.ownerUserId(),
+                    target == null ? null : target.ownerDepartmentId(),
                     safeValue(targetInstanceId),
                     safeValue(operation),
                     serviceRequestId,
@@ -188,19 +285,52 @@ public class PluginServiceCallCoordinator {
                     truncate(safeValue(errorMessage), 1024)
             ));
         } catch (Exception exception) {
-            log.warn("Failed to write plugin service call log: caller={}, target={}, operation={}", callerPluginId, targetPluginId, operation, exception);
+            log.warn("Failed to write plugin service call log: callerInstallationId={}, targetInstallationId={}, operation={}",
+                    principal.installationId(), target == null ? "" : target.installationId(), operation, exception);
         }
     }
 
-    private Long jobId(String value) {
-        if (value == null || value.isBlank()) {
-            return null;
-        }
+    private void audit(
+            PluginRuntimePrincipal principal,
+            PluginRuntimeRecord target,
+            String operation,
+            String callerRequestId,
+            String serviceRequestId,
+            long timeoutMillis,
+            String requestJson,
+            String responseJson,
+            boolean success,
+            String errorType,
+            long startedAt
+    ) {
+        Map<String, Object> detail = new LinkedHashMap<>();
+        detail.put("callerInstallationId", principal.installationId());
+        detail.put("callerPluginId", principal.pluginId());
+        detail.put("callerInstanceId", principal.instanceId());
+        detail.put("targetInstallationId", target == null ? "" : target.installationId());
+        detail.put("targetPluginId", target == null ? "" : target.pluginId());
+        detail.put("operation", operation);
+        detail.put("callerRequestId", callerRequestId == null ? "" : callerRequestId);
+        detail.put("serviceRequestId", serviceRequestId);
+        detail.put("jobId", principal.jobId());
+        detail.put("executionId", principal.executionId());
+        detail.put("timeoutMillis", timeoutMillis);
+        detail.put("requestBytes", bytes(requestJson));
+        detail.put("responseBytes", bytes(responseJson));
+        detail.put("success", success);
+        detail.put("errorType", errorType == null ? "" : errorType);
+        detail.put("durationMillis", System.currentTimeMillis() - startedAt);
         try {
-            return Long.parseLong(value);
-        } catch (NumberFormatException exception) {
-            return null;
+            auditStore.insert(principal.installationId(), principal.pluginId(), principal.instanceId(),
+                    "plugin:" + principal.installationId(), "PLUGIN_SERVICE_CALL", objectMapper.writeValueAsString(detail));
+        } catch (Exception exception) {
+            log.warn("Failed to write plugin service call audit: callerInstallationId={}, targetInstallationId={}, operation={}",
+                    principal.installationId(), target == null ? "" : target.installationId(), operation, exception);
         }
+    }
+
+    private int bytes(String value) {
+        return (value == null ? "" : value).getBytes(StandardCharsets.UTF_8).length;
     }
 
     private String truncate(String value, int maxLength) {
@@ -211,29 +341,13 @@ public class PluginServiceCallCoordinator {
         return value == null ? "" : value;
     }
 
-    private void audit(String callerPluginId, String callerInstanceId, String targetPluginId, String operation, String callerRequestId, String serviceRequestId, long timeoutMillis, String requestJson, String responseJson, boolean success, String errorType, long startedAt) {
-        Map<String, Object> detail = new LinkedHashMap<>();
-        detail.put("callerPluginId", callerPluginId);
-        detail.put("callerInstanceId", callerInstanceId);
-        detail.put("targetPluginId", targetPluginId);
-        detail.put("operation", operation);
-        detail.put("callerRequestId", callerRequestId == null ? "" : callerRequestId);
-        detail.put("serviceRequestId", serviceRequestId);
-        detail.put("timeoutMillis", timeoutMillis);
-        detail.put("requestBytes", bytes(requestJson));
-        detail.put("responseBytes", bytes(responseJson));
-        detail.put("success", success);
-        detail.put("errorType", errorType == null ? "" : errorType);
-        detail.put("durationMillis", System.currentTimeMillis() - startedAt);
-        try {
-            auditStore.insert(callerPluginId, callerInstanceId, "plugin:" + callerPluginId, "PLUGIN_SERVICE_CALL", objectMapper.writeValueAsString(detail));
-        } catch (Exception exception) {
-            log.warn("Failed to write plugin service call audit: caller={}, target={}, operation={}", callerPluginId, targetPluginId, operation, exception);
-        }
+    private String nullable(String value) {
+        String normalized = safe(value);
+        return normalized.isBlank() ? null : normalized;
     }
 
-    private int bytes(String value) {
-        return (value == null ? "" : value).getBytes(StandardCharsets.UTF_8).length;
+    private String errorMessage(RuntimeException exception) {
+        return exception.getMessage() == null ? "" : exception.getMessage();
     }
 
     private String safe(String value) {

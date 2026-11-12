@@ -11,16 +11,16 @@ public class PluginConfigStore {
         this.mapper = mapper;
     }
 
-    public String getConfigJson(String pluginId) {
-        String configJson = mapper.findConfigJson(pluginId);
+    public String getConfigJson(String installationId) {
+        String configJson = mapper.findConfigJson(installationId);
         return configJson == null ? "{}" : configJson;
     }
 
-    public void upsertConfigJson(String pluginId, String configJson) {
-        mapper.upsertConfigJson(pluginId, configJson);
+    public void upsertConfigJson(String installationId, String configJson) {
+        mapper.upsertConfigJson(installationId, configJson);
     }
 
-    public int deleteByPluginId(String pluginId) {
-        return mapper.deleteByPluginId(pluginId);
+    public int deleteByInstallationId(String installationId) {
+        return mapper.deleteByInstallationId(installationId);
     }
 }

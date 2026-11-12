@@ -3,6 +3,17 @@ plugins {
     id 'io.spring.dependency-management'
 }
 
+sourceSets {
+    frontendIntegrationPlugin {
+        java.srcDirs = ['src/frontendIntegrationPlugin/java']
+        resources.srcDirs = ['src/frontendIntegrationPlugin/resources']
+    }
+    frontendIntegrationServicePlugin {
+        java.srcDirs = ['src/frontendIntegrationServicePlugin/java']
+        resources.srcDirs = ['src/frontendIntegrationServicePlugin/resources']
+    }
+}
+
 dependencies {
     implementation project(':sky-plugin-api')
     implementation project(':sky-plugin-protocol')
@@ -25,4 +36,74 @@ dependencies {
     runtimeOnly 'io.jsonwebtoken:jjwt-jackson:0.12.6'
     runtimeOnly 'com.mysql:mysql-connector-j'
     testImplementation 'org.springframework.boot:spring-boot-starter-test'
+    testImplementation 'org.springframework.security:spring-security-test'
+    testRuntimeOnly 'com.h2database:h2'
+    frontendIntegrationPluginImplementation project(':sky-plugin-api')
+    frontendIntegrationServicePluginImplementation project(':sky-plugin-api')
+}
+
+tasks.register('frontendIntegrationPluginJar', Jar) {
+    group = 'verification'
+    description = 'Builds the minimal plugin used by frontend/backend integration tests.'
+    dependsOn sourceSets.frontendIntegrationPlugin.classesTaskName
+    archiveFileName = 'frontend-integration-plugin.jar'
+    destinationDirectory = layout.buildDirectory.dir('fixtures')
+    from sourceSets.frontendIntegrationPlugin.output
+}
+
+tasks.register('frontendIntegrationServicePluginJar', Jar) {
+    group = 'verification'
+    description = 'Builds the SERVICE plugin used by frontend/backend integration tests.'
+    dependsOn sourceSets.frontendIntegrationServicePlugin.classesTaskName
+    archiveFileName = 'frontend-integration-service-plugin.jar'
+    destinationDirectory = layout.buildDirectory.dir('fixtures')
+    from sourceSets.frontendIntegrationServicePlugin.output
+}
+
+tasks.register('frontendIntegrationDependencyJar', Jar) {
+    group = 'verification'
+    description = 'Builds a harmless local Maven dependency fixture jar.'
+    archiveFileName = 'frontend-integration-local-helper-1.0.0.jar'
+    destinationDirectory = layout.buildDirectory.dir('fixtures')
+    from('src/frontendIntegrationDependency/resources')
+}
+
+tasks.named('test') {
+    useJUnitPlatform {
+        excludeTags 'frontend-integration'
+    }
+}
+
+def frontendIntegrationPluginJarTask = tasks.named('frontendIntegrationPluginJar', Jar)
+def frontendIntegrationServicePluginJarTask = tasks.named('frontendIntegrationServicePluginJar', Jar)
+def frontendIntegrationDependencyJarTask = tasks.named('frontendIntegrationDependencyJar', Jar)
+def frontendIntegrationRunnerJarTask = project(':sky-plugin-runner-java').tasks.named('jar', Jar)
+
+tasks.register('frontendIntegrationTest', Test) {
+    group = 'verification'
+    description = 'Runs the explicit real-MySQL frontend/backend integration suite.'
+    testClassesDirs = sourceSets.test.output.classesDirs
+    classpath = sourceSets.test.runtimeClasspath
+    useJUnitPlatform {
+        includeTags 'frontend-integration'
+    }
+    maxParallelForks = 1
+    shouldRunAfter tasks.named('test')
+    dependsOn tasks.named('testClasses'), frontendIntegrationPluginJarTask, frontendIntegrationServicePluginJarTask, frontendIntegrationDependencyJarTask, frontendIntegrationRunnerJarTask
+
+    doFirst {
+        String allowReset = System.getenv('SKY_IT_ALLOW_RESET') ?: String.valueOf(project.findProperty('skyItAllowReset') ?: '')
+        if (!'true'.equalsIgnoreCase(allowReset)) {
+            throw new GradleException('frontendIntegrationTest resets only sky_new_frontend_it; set SKY_IT_ALLOW_RESET=true to confirm')
+        }
+        systemProperty 'sky.it.allow-reset', 'true'
+        systemProperty 'sky.it.db.url', System.getenv('SKY_IT_DB_URL') ?: 'jdbc:mysql://localhost:3306/sky_new_frontend_it?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai&useSSL=false&allowPublicKeyRetrieval=true&createDatabaseIfNotExist=true'
+        systemProperty 'sky.it.db.username', System.getenv('SKY_IT_DB_USERNAME') ?: 'root'
+        systemProperty 'sky.it.db.password', System.getenv('SKY_IT_DB_PASSWORD') ?: 'root'
+        systemProperty 'sky.it.plugin.jar', frontendIntegrationPluginJarTask.get().archiveFile.get().asFile.absolutePath
+        systemProperty 'sky.it.service.plugin.jar', frontendIntegrationServicePluginJarTask.get().archiveFile.get().asFile.absolutePath
+        systemProperty 'sky.it.dependency.jar', frontendIntegrationDependencyJarTask.get().archiveFile.get().asFile.absolutePath
+        systemProperty 'sky.it.runner.jar', frontendIntegrationRunnerJarTask.get().archiveFile.get().asFile.absolutePath
+        systemProperty 'sky.it.workspace', layout.buildDirectory.dir('frontend-integration').get().asFile.absolutePath
+    }
 }

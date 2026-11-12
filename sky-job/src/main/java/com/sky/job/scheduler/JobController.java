@@ -7,6 +7,7 @@ import com.sky.job.scheduler.dto.JobResponse;
 import com.sky.job.scheduler.dto.ManualRunJobRequest;
 import com.sky.job.scheduler.dto.PageResponse;
 import com.sky.job.scheduler.dto.UpdateJobRequest;
+import com.sky.job.scheduler.dto.ReplaceJobNotificationChannelsRequest;
 import com.sky.job.security.AuthenticatedUser;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
@@ -35,44 +36,44 @@ public class JobController {
     }
 
     @GetMapping
-    public PageResponse<JobResponse> list(@RequestParam(required = false) Integer page, @RequestParam(required = false) Integer size) {
-        return jobService.list(page, size);
+    public PageResponse<JobResponse> list(@AuthenticationPrincipal AuthenticatedUser user, @RequestParam(required = false) Integer page, @RequestParam(required = false) Integer size) {
+        return jobService.list(user, page, size);
     }
 
     @GetMapping("/{id}")
-    public JobResponse get(@PathVariable long id) {
-        return jobService.get(id);
+    public JobResponse get(@PathVariable long id, @AuthenticationPrincipal AuthenticatedUser user) {
+        return jobService.get(id, user);
     }
 
     @PostMapping
     public JobResponse create(@Valid @RequestBody CreateJobRequest request, @AuthenticationPrincipal AuthenticatedUser user, HttpServletRequest httpRequest) {
-        return jobService.create(request, user.username(), httpRequest);
+        return jobService.create(request, user, httpRequest);
     }
 
     @PutMapping("/{id}")
     public JobResponse update(@PathVariable long id, @Valid @RequestBody UpdateJobRequest request, @AuthenticationPrincipal AuthenticatedUser user, HttpServletRequest httpRequest) {
-        return jobService.update(id, request, user.username(), httpRequest);
+        return jobService.update(id, request, user, httpRequest);
     }
 
     @DeleteMapping("/{id}")
     public Map<String, Boolean> delete(@PathVariable long id, @AuthenticationPrincipal AuthenticatedUser user, HttpServletRequest httpRequest) {
-        jobService.delete(id, user.username(), httpRequest);
+        jobService.delete(id, user, httpRequest);
         return Map.of("success", true);
     }
 
     @PostMapping("/{id}/pause")
     public JobResponse pause(@PathVariable long id, @AuthenticationPrincipal AuthenticatedUser user, HttpServletRequest httpRequest) {
-        return jobService.pause(id, user.username(), httpRequest);
+        return jobService.pause(id, user, httpRequest);
     }
 
     @PostMapping("/{id}/resume")
     public JobResponse resume(@PathVariable long id, @AuthenticationPrincipal AuthenticatedUser user, HttpServletRequest httpRequest) {
-        return jobService.resume(id, user.username(), httpRequest);
+        return jobService.resume(id, user, httpRequest);
     }
 
     @PostMapping("/{id}/run")
     public Map<String, Long> run(@PathVariable long id, @Valid @RequestBody(required = false) ManualRunJobRequest request, @AuthenticationPrincipal AuthenticatedUser user, HttpServletRequest httpRequest) {
-        return Map.of("executionId", jobService.run(id, request, user.username(), httpRequest));
+        return Map.of("executionId", jobService.run(id, request, user, httpRequest));
     }
 
     @GetMapping("/cron/validate")
@@ -86,7 +87,12 @@ public class JobController {
     }
 
     @GetMapping("/{id}/executions")
-    public PageResponse<JobExecutionResponse> executions(@PathVariable long id, @RequestParam(required = false) Integer page, @RequestParam(required = false) Integer size) {
-        return jobService.executions(id, null, null, page, size);
+    public PageResponse<JobExecutionResponse> executions(@PathVariable long id, @AuthenticationPrincipal AuthenticatedUser user, @RequestParam(required = false) Integer page, @RequestParam(required = false) Integer size) {
+        return jobService.executions(id, null, null, null, user, page, size);
+    }
+
+    @PutMapping("/{id}/notification-channels")
+    public JobResponse replaceNotificationChannels(@PathVariable long id, @Valid @RequestBody ReplaceJobNotificationChannelsRequest request, @AuthenticationPrincipal AuthenticatedUser user) {
+        return jobService.replaceNotificationChannels(id, request, user);
     }
 }

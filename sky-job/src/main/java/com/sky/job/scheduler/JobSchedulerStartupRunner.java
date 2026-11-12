@@ -36,10 +36,10 @@ public class JobSchedulerStartupRunner implements ApplicationRunner {
         jobStore.resetRunningToIdle();
         executionStore.markSystemExitForRunning();
         quartzJobUtils.clear();
-        for (ScheduledJob job : jobStore.findEnabledJobs()) {
+        for (ScheduledJob job : jobStore.findEnabledJobsUnscoped()) {
             try {
                 cronUtils.validate(job.cronExpression());
-                runtimeMetadataStore.findByPluginId(job.pluginId()).orElseThrow(() -> new IllegalArgumentException("Plugin runtime not found"));
+                runtimeMetadataStore.findByInstallationId(job.pluginInstallationId()).orElseThrow(() -> new IllegalArgumentException("Plugin installation not found"));
                 quartzJobUtils.schedule(job);
             } catch (Exception exception) {
                 log.warn("Failed to restore job schedule: {}", job.id(), exception);

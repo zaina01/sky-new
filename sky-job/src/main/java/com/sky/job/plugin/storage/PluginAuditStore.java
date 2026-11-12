@@ -5,6 +5,7 @@ import org.springframework.stereotype.Repository;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import com.sky.job.security.EffectiveDataScope;
 
 @Repository
 public class PluginAuditStore {
@@ -14,11 +15,16 @@ public class PluginAuditStore {
         this.mapper = mapper;
     }
 
+    public void insert(String installationId, String pluginId, String instanceId, String actor, String action, String detailJson) {
+        mapper.insert(safe(installationId), safe(pluginId), safe(instanceId), safe(actor), action, detailJson == null || detailJson.isBlank() ? "{}" : detailJson);
+    }
+
     public void insert(String pluginId, String instanceId, String actor, String action, String detailJson) {
-        mapper.insert(safe(pluginId), safe(instanceId), safe(actor), action, detailJson == null || detailJson.isBlank() ? "{}" : detailJson);
+        insert("", pluginId, instanceId, actor, action, detailJson);
     }
 
     public List<PluginAuditLog> list(
+            String installationId,
             String pluginId,
             String instanceId,
             String actor,
@@ -26,9 +32,11 @@ public class PluginAuditStore {
             LocalDateTime startTime,
             LocalDateTime endTime,
             Integer page,
+            EffectiveDataScope scope,
             Integer size
     ) {
         return mapper.list(
+                trim(installationId),
                 trim(pluginId),
                 trim(instanceId),
                 trim(actor),
@@ -36,19 +44,22 @@ public class PluginAuditStore {
                 trim(action),
                 startTime,
                 endTime,
+                scope,
                 normalizedSize(size),
                 (normalizedPage(page) - 1) * normalizedSize(size));
     }
 
     public long count(
+            String installationId,
             String pluginId,
             String instanceId,
             String actor,
             String action,
             LocalDateTime startTime,
-            LocalDateTime endTime
+            LocalDateTime endTime,
+            EffectiveDataScope scope
     ) {
-        return mapper.count(trim(pluginId), trim(instanceId), trim(actor), like(actor), trim(action), startTime, endTime);
+        return mapper.count(trim(installationId), trim(pluginId), trim(instanceId), trim(actor), like(actor), trim(action), startTime, endTime, scope);
     }
 
     public long countOlderThan(LocalDateTime cutoff) {

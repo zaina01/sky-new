@@ -9,6 +9,7 @@ import java.util.List;
 
 public interface PluginTaskLogMapper {
     int insert(
+            @Param("installationId") String installationId,
             @Param("pluginId") String pluginId,
             @Param("instanceId") String instanceId,
             @Param("jobId") String jobId,
@@ -20,13 +21,13 @@ public interface PluginTaskLogMapper {
     );
 
     List<PluginTaskLog> listByRequest(
-            @Param("pluginId") String pluginId,
+            @Param("installationId") String installationId,
             @Param("requestId") String requestId,
             @Param("limit") int limit,
             @Param("offset") int offset
     );
 
-    long countByRequest(@Param("pluginId") String pluginId, @Param("requestId") String requestId);
+    long countByRequest(@Param("installationId") String installationId, @Param("requestId") String requestId);
 
     long countOlderThan(@Param("cutoff") LocalDateTime cutoff);
 

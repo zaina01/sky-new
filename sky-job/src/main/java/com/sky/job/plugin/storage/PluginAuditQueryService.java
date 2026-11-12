@@ -3,18 +3,24 @@ package com.sky.job.plugin.storage;
 import com.sky.job.plugin.storage.dto.PluginAuditLogResponse;
 import com.sky.job.scheduler.dto.PageResponse;
 import org.springframework.stereotype.Service;
+import com.sky.job.security.AuthenticatedUser;
+import com.sky.job.security.DataScopeService;
+import com.sky.job.security.PermissionNames;
 
 import java.time.LocalDateTime;
 
 @Service
 public class PluginAuditQueryService {
     private final PluginAuditStore auditStore;
+    private final DataScopeService dataScopeService;
 
-    public PluginAuditQueryService(PluginAuditStore auditStore) {
+    public PluginAuditQueryService(PluginAuditStore auditStore, DataScopeService dataScopeService) {
         this.auditStore = auditStore;
+        this.dataScopeService = dataScopeService;
     }
 
     public PageResponse<PluginAuditLogResponse> listAuditLogs(
+            String installationId,
             String pluginId,
             String instanceId,
             String actor,
@@ -22,14 +28,15 @@ public class PluginAuditQueryService {
             LocalDateTime startTime,
             LocalDateTime endTime,
             Integer page,
-            Integer size
+            Integer size,
+            AuthenticatedUser user
     ) {
         validateTimeRange(startTime, endTime);
         return new PageResponse<>(
-                auditStore.list(pluginId, instanceId, actor, action, startTime, endTime, page, size).stream().map(PluginAuditLogResponse::from).toList(),
+                auditStore.list(installationId, pluginId, instanceId, actor, action, startTime, endTime, page, dataScopeService.resolve(user, PermissionNames.PLUGIN_AUDIT_READ), size).stream().map(PluginAuditLogResponse::from).toList(),
                 normalizedPage(page),
                 normalizedSize(size),
-                auditStore.count(pluginId, instanceId, actor, action, startTime, endTime)
+                auditStore.count(installationId, pluginId, instanceId, actor, action, startTime, endTime, dataScopeService.resolve(user, PermissionNames.PLUGIN_AUDIT_READ))
         );
     }
 

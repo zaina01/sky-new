@@ -6,6 +6,7 @@ import java.time.LocalDateTime;
 
 public record PluginTaskLogResponse(
         long id,
+        String installationId,
         String pluginId,
         String instanceId,
         String jobId,
@@ -19,6 +20,7 @@ public record PluginTaskLogResponse(
     public static PluginTaskLogResponse from(PluginTaskLog log) {
         return new PluginTaskLogResponse(
                 log.id(),
+                log.installationId(),
                 log.pluginId(),
                 log.instanceId(),
                 log.jobId(),

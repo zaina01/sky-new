@@ -20,6 +20,7 @@ public class PluginLogStore {
 
     public void insert(PluginRuntimePrincipal principal, PluginLogEvent event, String message) {
         mapper.insert(
+                principal.installationId(),
                 principal.pluginId(),
                 principal.instanceId(),
                 event.getJobId(),
@@ -30,14 +31,14 @@ public class PluginLogStore {
                 Timestamp.from(Instant.now()));
     }
 
-    public List<PluginTaskLog> listByRequest(String pluginId, String requestId, Integer page, Integer size) {
+    public List<PluginTaskLog> listByRequest(String installationId, String requestId, Integer page, Integer size) {
         int normalizedPage = Math.max(page == null ? 1 : page, 1);
         int normalizedSize = Math.min(Math.max(size == null ? 20 : size, 1), 100);
-        return mapper.listByRequest(pluginId, requestId, normalizedSize, (normalizedPage - 1) * normalizedSize);
+        return mapper.listByRequest(installationId, requestId, normalizedSize, (normalizedPage - 1) * normalizedSize);
     }
 
-    public long countByRequest(String pluginId, String requestId) {
-        return mapper.countByRequest(pluginId, requestId);
+    public long countByRequest(String installationId, String requestId) {
+        return mapper.countByRequest(installationId, requestId);
     }
 
     public long countOlderThan(LocalDateTime cutoff) {

@@ -3,13 +3,12 @@ package com.sky.job.plugin.artifact.dependency;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.sky.job.plugin.artifact.PluginArtifactRegistry;
+import com.sky.job.plugin.artifact.PluginDefinition;
 import com.sky.job.plugin.artifact.dependency.dto.PluginDependencyInstallRequest;
 import com.sky.job.plugin.artifact.dependency.dto.PluginDependencyInstallResponse;
 import com.sky.job.plugin.artifact.dependency.dto.PluginDependencyResponse;
 import com.sky.job.plugin.artifact.dependency.dto.PluginDependencyUninstallRequest;
-import com.sky.job.plugin.runtime.PluginRuntimeRecord;
 import com.sky.job.plugin.storage.PluginAuditStore;
-import com.sky.job.scheduler.PluginRuntimeMetadataStore;
 import org.springframework.stereotype.Service;
 
 import java.nio.file.Path;
@@ -20,7 +19,6 @@ import java.util.Map;
 
 @Service
 public class PluginDependencyManagementService {
-    private final PluginRuntimeMetadataStore runtimeStore;
     private final PluginDependencyDeclarationParser declarationParser;
     private final PluginMavenDependencyResolver dependencyResolver;
     private final PluginArtifactRegistry registry;
@@ -28,14 +26,12 @@ public class PluginDependencyManagementService {
     private final ObjectMapper objectMapper;
 
     public PluginDependencyManagementService(
-            PluginRuntimeMetadataStore runtimeStore,
             PluginDependencyDeclarationParser declarationParser,
             PluginMavenDependencyResolver dependencyResolver,
             PluginArtifactRegistry registry,
             PluginAuditStore auditStore,
             ObjectMapper objectMapper
     ) {
-        this.runtimeStore = runtimeStore;
         this.declarationParser = declarationParser;
         this.dependencyResolver = dependencyResolver;
         this.registry = registry;
@@ -44,44 +40,44 @@ public class PluginDependencyManagementService {
     }
 
     public List<PluginDependencyResponse> list(String pluginId) {
-        PluginRuntimeRecord record = record(pluginId);
-        return parseStoredDependencies(record.dependencyJarsJson());
+        PluginDefinition definition = definition(pluginId);
+        return parseStoredDependencies(definition.dependencyJarsJson());
     }
 
     public PluginDependencyInstallResponse install(String pluginId, PluginDependencyInstallRequest request, String actor) {
-        PluginRuntimeRecord record = record(pluginId);
+        PluginDefinition definition = definition(pluginId);
         String mode = mode(request == null ? null : request.mode());
         List<PluginDependencyDeclaration> declarations = declarationParser.parseCoordinates(request == null ? null : request.dependencies());
         List<ResolvedPluginDependency> resolved = dependencyResolver.resolve(declarations);
-        List<ResolvedPluginDependency> stored = "replace".equals(mode) ? resolved : merge(parseResolvedDependencies(record.dependencyJarsJson()), resolved);
+        List<ResolvedPluginDependency> stored = "replace".equals(mode) ? resolved : merge(parseResolvedDependencies(definition.dependencyJarsJson()), resolved);
         registry.updateDependencies(pluginId, stored);
-        auditStore.insert(pluginId, record.instanceId(), actor, "PLUGIN_DEPENDENCY_INSTALL", auditDetail(declarations.size(), resolved.size(), stored.size(), mode));
+        auditStore.insert("", pluginId, "", actor, "PLUGIN_DEPENDENCY_INSTALL", auditDetail(declarations.size(), resolved.size(), stored.size(), mode));
         return response(pluginId, declarations.size(), stored);
     }
 
     public PluginDependencyInstallResponse reinstall(String pluginId, String actor) {
-        PluginRuntimeRecord record = record(pluginId);
-        List<PluginDependencyDeclaration> declarations = declarationParser.parse(Path.of(record.artifactPath()));
+        PluginDefinition definition = definition(pluginId);
+        List<PluginDependencyDeclaration> declarations = declarationParser.parse(Path.of(definition.artifactPath()));
         List<ResolvedPluginDependency> resolved = dependencyResolver.resolve(declarations);
         registry.updateDependencies(pluginId, resolved);
-        auditStore.insert(pluginId, record.instanceId(), actor, "PLUGIN_DEPENDENCY_REINSTALL", auditDetail(declarations.size(), resolved.size(), resolved.size(), "replace"));
+        auditStore.insert("", pluginId, "", actor, "PLUGIN_DEPENDENCY_REINSTALL", auditDetail(declarations.size(), resolved.size(), resolved.size(), "replace"));
         return response(pluginId, declarations.size(), resolved);
     }
 
     public PluginDependencyInstallResponse uninstall(String pluginId, PluginDependencyUninstallRequest request, String actor) {
-        PluginRuntimeRecord record = record(pluginId);
+        PluginDefinition definition = definition(pluginId);
         List<PluginDependencyDeclaration> declarations = declarationParser.parseCoordinates(request == null ? null : request.dependencies());
-        List<ResolvedPluginDependency> existing = parseResolvedDependencies(record.dependencyJarsJson());
+        List<ResolvedPluginDependency> existing = parseResolvedDependencies(definition.dependencyJarsJson());
         List<ResolvedPluginDependency> stored = existing.stream()
                 .filter(dependency -> declarations.stream().noneMatch(declaration -> matches(dependency, declaration)))
                 .toList();
         registry.updateDependencies(pluginId, stored);
-        auditStore.insert(pluginId, record.instanceId(), actor, "PLUGIN_DEPENDENCY_UNINSTALL", auditDetail(declarations.size(), 0, stored.size(), "remove"));
+        auditStore.insert("", pluginId, "", actor, "PLUGIN_DEPENDENCY_UNINSTALL", auditDetail(declarations.size(), 0, stored.size(), "remove"));
         return response(pluginId, declarations.size(), stored);
     }
 
-    private PluginRuntimeRecord record(String pluginId) {
-        return runtimeStore.findRuntimeByPluginId(pluginId).orElseThrow(() -> new IllegalArgumentException("Plugin runtime not found"));
+    private PluginDefinition definition(String pluginId) {
+        return registry.find(pluginId).orElseThrow(() -> new IllegalArgumentException("Plugin definition not found"));
     }
 
     private String mode(String value) {

@@ -62,6 +62,7 @@ public class RoleStore {
 
     public int delete(Long roleId) {
         mapper.deleteRolePermissions(roleId);
+        mapper.deleteRoleDepartments(roleId);
         return mapper.delete(roleId);
     }
 
@@ -78,6 +79,16 @@ public class RoleStore {
 
     public boolean isAssigned(Long roleId) {
         return mapper.countAssigned(roleId) > 0;
+    }
+
+    public Set<Long> departmentIds(Long roleId) {
+        return mapper.departmentIds(roleId).stream().collect(Collectors.toUnmodifiableSet());
+    }
+
+    public void replaceDataScope(Long roleId, com.sky.job.security.DataScopeType dataScope, Set<Long> departmentIds) {
+        mapper.updateDataScope(roleId, dataScope.name());
+        mapper.deleteRoleDepartments(roleId);
+        for (Long departmentId : departmentIds) mapper.assignDepartment(roleId, departmentId);
     }
 
     private String trim(String value) {

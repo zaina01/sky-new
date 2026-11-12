@@ -40,14 +40,14 @@ public class UserStore {
         return Optional.ofNullable(mapper.findByUserId(userId));
     }
 
-    public List<User> list(String username, Boolean enabled, Integer page, Integer size) {
+    public List<User> list(String username, Boolean enabled, List<Long> departmentFilterIds, com.sky.job.security.EffectiveDataScope scope, Integer page, Integer size) {
         int normalizedPage = normalizedPage(page);
         int normalizedSize = normalizedSize(size);
-        return mapper.list(trim(username), like(username), enabled, normalizedSize, (normalizedPage - 1) * normalizedSize);
+        return mapper.list(trim(username), like(username), enabled, departmentFilterIds, scope, normalizedSize, (normalizedPage - 1) * normalizedSize);
     }
 
-    public long count(String username, Boolean enabled) {
-        return mapper.count(trim(username), like(username), enabled);
+    public long count(String username, Boolean enabled, List<Long> departmentFilterIds, com.sky.job.security.EffectiveDataScope scope) {
+        return mapper.count(trim(username), like(username), enabled, departmentFilterIds, scope);
     }
 
     public void insert(User user) {
@@ -58,8 +58,8 @@ public class UserStore {
         mapper.updatePassword(userId, passwordHash);
     }
 
-    public int updateProfile(String userId, String email, String phone, String avatar, boolean enabled) {
-        return mapper.updateProfile(userId, email, phone, avatar, enabled);
+    public int updateProfile(String userId, String email, String phone, String avatar, Long departmentId, boolean enabled) {
+        return mapper.updateProfile(userId, email, phone, avatar, departmentId, enabled);
     }
 
     public int updateEnabled(String userId, boolean enabled) {
@@ -104,6 +104,10 @@ public class UserStore {
 
     public Set<String> permissions(String userId) {
         return mapper.permissions(userId).stream().collect(Collectors.toUnmodifiableSet());
+    }
+
+    public boolean hasOwnedResources(String userId) {
+        return mapper.countOwnedResources(userId) > 0;
     }
 
     private String trim(String value) {

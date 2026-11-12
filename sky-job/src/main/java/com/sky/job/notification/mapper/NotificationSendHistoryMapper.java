@@ -7,6 +7,7 @@ import org.apache.ibatis.annotations.Param;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
+import com.sky.job.security.EffectiveDataScope;
 
 public interface NotificationSendHistoryMapper {
     int insertPending(Map<String, Object> values);
@@ -77,11 +78,13 @@ public interface NotificationSendHistoryMapper {
             @Param("channelId") String channelId,
             @Param("channelType") String channelType,
             @Param("status") String status,
+            @Param("installationId") String installationId,
             @Param("pluginId") String pluginId,
             @Param("jobId") String jobId,
             @Param("executionId") Long executionId,
             @Param("startTime") LocalDateTime startTime,
             @Param("endTime") LocalDateTime endTime,
+            @Param("scope") EffectiveDataScope scope,
             @Param("limit") int limit,
             @Param("offset") int offset
     );
@@ -91,22 +94,26 @@ public interface NotificationSendHistoryMapper {
             @Param("channelId") String channelId,
             @Param("channelType") String channelType,
             @Param("status") String status,
+            @Param("installationId") String installationId,
             @Param("pluginId") String pluginId,
             @Param("jobId") String jobId,
             @Param("executionId") Long executionId,
             @Param("startTime") LocalDateTime startTime,
-            @Param("endTime") LocalDateTime endTime
+            @Param("endTime") LocalDateTime endTime,
+            @Param("scope") EffectiveDataScope scope
     );
 
-    NotificationSendHistoryRow findById(@Param("id") long id);
+    NotificationSendHistoryRow findById(@Param("id") long id, @Param("scope") EffectiveDataScope scope);
+
+    NotificationSendHistoryRow findByIdUnscoped(@Param("id") long id);
 
     long countOlderThan(@Param("cutoff") LocalDateTime cutoff);
 
-    List<StatusCountRow> countByStatusBetween(@Param("startTime") LocalDateTime startTime, @Param("endTime") LocalDateTime endTime);
+    List<StatusCountRow> countByStatusBetween(@Param("startTime") LocalDateTime startTime, @Param("endTime") LocalDateTime endTime, @Param("scope") EffectiveDataScope scope);
 
-    List<DailyStatusCountRow> countDailyByStatus(@Param("startTime") LocalDateTime startTime, @Param("endTime") LocalDateTime endTime);
+    List<DailyStatusCountRow> countDailyByStatus(@Param("startTime") LocalDateTime startTime, @Param("endTime") LocalDateTime endTime, @Param("scope") EffectiveDataScope scope);
 
-    List<NotificationSendHistoryRow> listRecentFailures(@Param("failedStatus") String failedStatus, @Param("limit") int limit);
+    List<NotificationSendHistoryRow> listRecentFailures(@Param("failedStatus") String failedStatus, @Param("scope") EffectiveDataScope scope, @Param("limit") int limit);
 
     int deleteOlderThan(@Param("cutoff") LocalDateTime cutoff, @Param("limit") int limit);
 }

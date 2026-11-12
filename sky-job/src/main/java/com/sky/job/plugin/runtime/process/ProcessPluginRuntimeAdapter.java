@@ -48,7 +48,15 @@ public class ProcessPluginRuntimeAdapter implements PluginRuntimeAdapter {
     @Override
     public PluginRuntimeHandle start(PluginRuntimeSpec spec) {
         validator.validate(spec);
-        String token = tokenRegistry.register(spec.pluginId(), spec.instanceId(), spec.capabilities(), tokenTtl(spec));
+        String token = tokenRegistry.register(
+                spec.installationId(),
+                spec.pluginId(),
+                spec.instanceId(),
+                spec.jobId(),
+                spec.executionId(),
+                spec.capabilities(),
+                tokenTtl(spec)
+        );
         Process process = null;
         try {
             Files.createDirectories(spec.workDir());
@@ -60,6 +68,7 @@ public class ProcessPluginRuntimeAdapter implements PluginRuntimeAdapter {
             processBuilder.redirectOutput(ProcessBuilder.Redirect.appendTo(logFile.toFile()));
             Map<String, String> environment = processBuilder.environment();
             environment.clear();
+            environment.put("SKY_PLUGIN_INSTALLATION_ID", spec.installationId());
             environment.put("SKY_PLUGIN_ID", spec.pluginId());
             environment.put("SKY_PLUGIN_INSTANCE_ID", spec.instanceId());
             environment.put("SKY_PLUGIN_MAIN_CLASS", spec.mainClass());
@@ -72,7 +81,7 @@ public class ProcessPluginRuntimeAdapter implements PluginRuntimeAdapter {
             environment.put("SKY_PLUGIN_TOKEN", token);
             environment.put("SKY_PLUGIN_WORK_DIR", spec.workDir().toAbsolutePath().normalize().toString());
             process = processBuilder.start();
-            ProcessPluginRuntimeHandle handle = new ProcessPluginRuntimeHandle(spec.pluginId(), spec.instanceId(), port, token, logFile, process);
+            ProcessPluginRuntimeHandle handle = new ProcessPluginRuntimeHandle(spec.installationId(), spec.pluginId(), spec.instanceId(), port, token, logFile, process);
             healthChecker.awaitHealthy(handle, runtimeSettings.startupTimeout());
             return handle;
         } catch (IOException | RuntimeException exception) {

@@ -4,6 +4,7 @@ public record UpsertPluginAccountRequest(
         String accountId,
         String displayName,
         String accountJson,
-        Boolean enabled
+        Boolean enabled,
+        Long groupId
 ) {
 }

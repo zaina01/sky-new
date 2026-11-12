@@ -23,6 +23,7 @@ public class PluginArtifactMetadataExtractor {
     static final String TASK_SPI_ENTRY = "META-INF/services/com.sky.plugin.api.TaskPlugin";
     static final String SERVICE_SPI_ENTRY = "META-INF/services/com.sky.plugin.api.ServicePlugin";
     static final String LEGACY_MANIFEST_ENTRY = "META-INF/sky-plugin.json";
+    private static final int MAX_OBJECT_LIST_NESTING_DEPTH = 16;
     private static final List<String> FORBIDDEN_PLATFORM_CLASS_PREFIXES = List.of(
             "com/sky/plugin/api/",
             "com/sky/plugin/protocol/",
@@ -181,14 +182,14 @@ public class PluginArtifactMetadataExtractor {
             throw new IllegalArgumentException("Plugin config class is missing @PluginConfig: " + schemaClass);
         }
         Map<String, Object> schema = new LinkedHashMap<>();
-        schema.put("fields", configFields(metadata, classes, true));
+        schema.put("fields", configFields(metadata, classes, ObjectListTraversal.root(metadata.className())));
         return objectMapper.valueToTree(schema);
     }
 
     private List<Map<String, Object>> configFields(
             PluginClassMetadataScanner.PluginClassMetadata metadata,
             Map<String, PluginClassMetadataScanner.PluginClassMetadata> classes,
-            boolean allowObjectList
+            ObjectListTraversal traversal
     ) {
         List<PluginClassMetadataScanner.FieldMetadata> configFields = new ArrayList<>();
         Map<String, PluginClassMetadataScanner.ConfigFieldMetadata> annotationsByName = new LinkedHashMap<>();
@@ -205,7 +206,7 @@ public class PluginArtifactMetadataExtractor {
         }
         List<Map<String, Object>> fields = new ArrayList<>();
         for (PluginClassMetadataScanner.FieldMetadata field : configFields) {
-            fields.add(configField(field, classes, annotationsByName, allowObjectList));
+            fields.add(configField(field, classes, annotationsByName, traversal));
         }
         return fields;
     }
@@ -214,7 +215,7 @@ public class PluginArtifactMetadataExtractor {
             PluginClassMetadataScanner.FieldMetadata field,
             Map<String, PluginClassMetadataScanner.PluginClassMetadata> classes,
             Map<String, PluginClassMetadataScanner.ConfigFieldMetadata> annotationsByName,
-            boolean allowObjectList
+            ObjectListTraversal traversal
     ) {
         PluginClassMetadataScanner.ConfigFieldMetadata annotation = field.configField();
         String name = field.name();
@@ -229,7 +230,7 @@ public class PluginArtifactMetadataExtractor {
             value.put("visibleWhen", visibleWhen);
         }
         if ("OBJECT_LIST".equals(annotation.type())) {
-            value.put("itemSchema", objectListItemSchema(name, annotation, classes, allowObjectList));
+            value.put("itemSchema", objectListItemSchema(name, annotation, classes, traversal));
         } else if (!PluginClassMetadataScanner.VOID_CLASS_NAME.equals(annotation.itemClass())) {
             throw new IllegalArgumentException("Plugin config itemClass can only be used with OBJECT_LIST: " + name);
         }
@@ -240,11 +241,8 @@ public class PluginArtifactMetadataExtractor {
             String fieldName,
             PluginClassMetadataScanner.ConfigFieldMetadata annotation,
             Map<String, PluginClassMetadataScanner.PluginClassMetadata> classes,
-            boolean allowObjectList
+            ObjectListTraversal traversal
     ) {
-        if (!allowObjectList) {
-            throw new IllegalArgumentException("Nested OBJECT_LIST config field is not supported: " + fieldName);
-        }
         if (!annotation.options().isEmpty()) {
             throw new IllegalArgumentException("Plugin OBJECT_LIST config field must not declare options: " + fieldName);
         }
@@ -255,7 +253,8 @@ public class PluginArtifactMetadataExtractor {
         if (itemMetadata == null) {
             throw new IllegalArgumentException("Plugin OBJECT_LIST item class not found in artifact: " + annotation.itemClass());
         }
-        List<Map<String, Object>> itemFields = configFields(itemMetadata, classes, false);
+        ObjectListTraversal itemTraversal = traversal.enter("config", fieldName, annotation.itemClass());
+        List<Map<String, Object>> itemFields = configFields(itemMetadata, classes, itemTraversal);
         if (itemFields.isEmpty()) {
             throw new IllegalArgumentException("Plugin OBJECT_LIST item class must declare config fields: " + annotation.itemClass());
         }
@@ -325,7 +324,12 @@ public class PluginArtifactMetadataExtractor {
         if (metadata.pluginAccount() == null) {
             throw new IllegalArgumentException("Plugin account class is missing @PluginAccount: " + schemaClass);
         }
-        AccountFields accountFields = accountFields(metadata, classes, true, true);
+        AccountFields accountFields = accountFields(
+                metadata,
+                classes,
+                ObjectListTraversal.root(metadata.className()),
+                true
+        );
         Map<String, Object> schema = new LinkedHashMap<>();
         schema.put("fields", accountFields.fields());
         if (accountFields.accountIdField() != null) {
@@ -337,7 +341,7 @@ public class PluginArtifactMetadataExtractor {
     private AccountFields accountFields(
             PluginClassMetadataScanner.PluginClassMetadata metadata,
             Map<String, PluginClassMetadataScanner.PluginClassMetadata> classes,
-            boolean allowObjectList,
+            ObjectListTraversal traversal,
             boolean allowAccountId
     ) {
         List<PluginClassMetadataScanner.FieldMetadata> accountFields = new ArrayList<>();
@@ -389,7 +393,7 @@ public class PluginArtifactMetadataExtractor {
                 value.put("visibleWhen", visibleWhen);
             }
             if ("OBJECT_LIST".equals(annotation.type())) {
-                value.put("itemSchema", accountObjectListItemSchema(name, annotation, classes, allowObjectList));
+                value.put("itemSchema", accountObjectListItemSchema(name, annotation, classes, traversal));
             } else if (!PluginClassMetadataScanner.VOID_CLASS_NAME.equals(annotation.itemClass())) {
                 throw new IllegalArgumentException("Plugin account itemClass can only be used with OBJECT_LIST: " + name);
             }
@@ -402,11 +406,8 @@ public class PluginArtifactMetadataExtractor {
             String fieldName,
             PluginClassMetadataScanner.AccountFieldMetadata annotation,
             Map<String, PluginClassMetadataScanner.PluginClassMetadata> classes,
-            boolean allowObjectList
+            ObjectListTraversal traversal
     ) {
-        if (!allowObjectList) {
-            throw new IllegalArgumentException("Nested OBJECT_LIST account field is not supported: " + fieldName);
-        }
         if (!annotation.options().isEmpty()) {
             throw new IllegalArgumentException("Plugin OBJECT_LIST account field must not declare options: " + fieldName);
         }
@@ -417,7 +418,8 @@ public class PluginArtifactMetadataExtractor {
         if (itemMetadata == null) {
             throw new IllegalArgumentException("Plugin OBJECT_LIST account item class not found in artifact: " + annotation.itemClass());
         }
-        AccountFields itemFields = accountFields(itemMetadata, classes, false, false);
+        ObjectListTraversal itemTraversal = traversal.enter("account", fieldName, annotation.itemClass());
+        AccountFields itemFields = accountFields(itemMetadata, classes, itemTraversal, false);
         if (itemFields.fields().isEmpty()) {
             throw new IllegalArgumentException("Plugin OBJECT_LIST item class must declare account fields: " + annotation.itemClass());
         }
@@ -478,6 +480,30 @@ public class PluginArtifactMetadataExtractor {
             throw new IllegalArgumentException("Plugin account SWITCH visibleWhen value must be true or false: " + fieldName);
         }
         return value;
+    }
+
+    private record ObjectListTraversal(int depth, List<String> classPath) {
+        private static ObjectListTraversal root(String className) {
+            return new ObjectListTraversal(0, List.of(className));
+        }
+
+        private ObjectListTraversal enter(String schemaKind, String fieldName, String itemClass) {
+            List<String> nextClassPath = new ArrayList<>(classPath);
+            nextClassPath.add(itemClass);
+            String formattedPath = String.join(" -> ", nextClassPath);
+            if (classPath.contains(itemClass)) {
+                throw new IllegalArgumentException(
+                        "Plugin OBJECT_LIST " + schemaKind + " itemClass cycle detected at field " + fieldName + ": " + formattedPath
+                );
+            }
+            if (depth >= MAX_OBJECT_LIST_NESTING_DEPTH) {
+                throw new IllegalArgumentException(
+                        "Plugin OBJECT_LIST " + schemaKind + " nesting exceeds maximum depth "
+                                + MAX_OBJECT_LIST_NESTING_DEPTH + " at field " + fieldName + ": " + formattedPath
+                );
+            }
+            return new ObjectListTraversal(depth + 1, List.copyOf(nextClassPath));
+        }
     }
 
     private record AccountFields(List<Map<String, Object>> fields, String accountIdField) {

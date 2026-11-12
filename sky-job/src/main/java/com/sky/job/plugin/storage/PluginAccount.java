@@ -4,12 +4,14 @@ import java.time.LocalDateTime;
 
 public record PluginAccount(
         long id,
-        String pluginId,
+        String installationId,
         String accountId,
         String displayName,
         String accountJson,
         boolean enabled,
         LocalDateTime createdAt,
-        LocalDateTime updatedAt
+        LocalDateTime updatedAt,
+        Long groupId,
+        String groupName
 ) {
 }

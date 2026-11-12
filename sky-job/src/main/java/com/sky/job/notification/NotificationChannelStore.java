@@ -6,6 +6,7 @@ import org.springframework.stereotype.Repository;
 
 import java.util.List;
 import java.util.Optional;
+import com.sky.job.security.EffectiveDataScope;
 
 @Repository
 public class NotificationChannelStore {
@@ -15,24 +16,28 @@ public class NotificationChannelStore {
         this.mapper = mapper;
     }
 
-    public List<NotificationChannel> list(NotificationChannelType channelType, Boolean enabled, String channelId, String displayName, Integer page, Integer size) {
+    public List<NotificationChannel> list(NotificationChannelType channelType, Boolean enabled, String channelId, String displayName, EffectiveDataScope scope, Integer page, Integer size) {
         int normalizedPage = normalizedPage(page);
         int normalizedSize = normalizedSize(size);
-        return mapper.list(channelType == null ? null : channelType.name(), enabled, trim(channelId), trim(displayName), like(displayName), normalizedSize, (normalizedPage - 1) * normalizedSize).stream()
+        return mapper.list(channelType == null ? null : channelType.name(), enabled, trim(channelId), trim(displayName), like(displayName), scope, normalizedSize, (normalizedPage - 1) * normalizedSize).stream()
                 .map(this::map)
                 .toList();
     }
 
-    public long count(NotificationChannelType channelType, Boolean enabled, String channelId, String displayName) {
-        return mapper.count(channelType == null ? null : channelType.name(), enabled, trim(channelId), trim(displayName), like(displayName));
+    public long count(NotificationChannelType channelType, Boolean enabled, String channelId, String displayName, EffectiveDataScope scope) {
+        return mapper.count(channelType == null ? null : channelType.name(), enabled, trim(channelId), trim(displayName), like(displayName), scope);
     }
 
-    public Optional<NotificationChannel> findByChannelId(String channelId) {
-        return Optional.ofNullable(mapper.findByChannelId(channelId)).map(this::map);
+    public Optional<NotificationChannel> findByChannelId(String channelId, EffectiveDataScope scope) {
+        return Optional.ofNullable(mapper.findByChannelId(channelId, scope)).map(this::map);
     }
 
-    public void insert(String channelId, NotificationChannelType channelType, String displayName, boolean enabled, String configJson, String remark, String createdBy) {
-        mapper.insert(channelId, channelType.name(), displayName, enabled, configJson, remark, createdBy);
+    public Optional<NotificationChannel> findByChannelIdUnscoped(String channelId) {
+        return Optional.ofNullable(mapper.findByChannelIdUnscoped(channelId)).map(this::map);
+    }
+
+    public void insert(String channelId, NotificationChannelType channelType, String displayName, boolean enabled, String configJson, String remark, String ownerUserId, Long ownerDepartmentId, String createdBy) {
+        mapper.insert(channelId, channelType.name(), displayName, enabled, configJson, remark, ownerUserId, ownerDepartmentId, createdBy);
     }
 
     public int update(String channelId, NotificationChannelType channelType, String displayName, boolean enabled, String configJson, String remark, String updatedBy) {
@@ -47,15 +52,23 @@ public class NotificationChannelStore {
         return mapper.delete(channelId);
     }
 
-    public List<NotificationChannel> listEnabled() {
-        return mapper.listEnabled().stream().map(this::map).toList();
+    public List<NotificationChannel> listEnabledUnscoped() {
+        return mapper.listEnabledUnscoped().stream().map(this::map).toList();
     }
 
-    public List<NotificationChannel> listEnabledByIds(List<String> channelIds) {
+    public List<NotificationChannel> listByIdsUnscoped(List<String> channelIds) {
         if (channelIds == null || channelIds.isEmpty()) {
             return List.of();
         }
-        return mapper.listEnabledByIds(channelIds).stream().map(this::map).toList();
+        return mapper.listByIdsUnscoped(channelIds).stream().map(this::map).toList();
+    }
+
+    public boolean hasBindings(String channelId) {
+        return mapper.countBindings(channelId) > 0;
+    }
+
+    public int transferOwnership(String channelId, String ownerUserId, Long ownerDepartmentId, String actor) {
+        return mapper.transferOwnership(channelId, ownerUserId, ownerDepartmentId, actor);
     }
 
     private NotificationChannel map(NotificationChannelRow row) {
@@ -67,6 +80,10 @@ public class NotificationChannelStore {
                 row.enabled(),
                 row.configJson(),
                 row.remark(),
+                row.ownerUserId(),
+                row.ownerUsername(),
+                row.ownerDepartmentId(),
+                row.ownerDepartmentName(),
                 row.createdBy(),
                 row.updatedBy(),
                 row.createdAt(),

@@ -7,8 +7,10 @@ import java.time.LocalDateTime;
 
 public record PluginRuntimeResponse(
         long id,
+        String installationId,
         String pluginId,
         String instanceId,
+        String installationName,
         String version,
         String displayName,
         String mainClass,
@@ -27,6 +29,10 @@ public record PluginRuntimeResponse(
         boolean remoteDebugSuspend,
         boolean managedByCurrentHost,
         PluginRuntimeState liveState,
+        String ownerUserId,
+        String ownerUsername,
+        Long ownerDepartmentId,
+        String ownerDepartmentName,
         LocalDateTime startedAt,
         LocalDateTime createdAt,
         LocalDateTime updatedAt
@@ -34,8 +40,10 @@ public record PluginRuntimeResponse(
     public static PluginRuntimeResponse from(PluginRuntimeRecord record, boolean managedByCurrentHost, PluginRuntimeState liveState) {
         return new PluginRuntimeResponse(
                 record.id(),
+                record.installationId(),
                 record.pluginId(),
                 record.instanceId(),
+                record.installationName(),
                 record.version(),
                 record.displayName(),
                 record.mainClass(),
@@ -54,6 +62,10 @@ public record PluginRuntimeResponse(
                 record.remoteDebugSuspend(),
                 managedByCurrentHost,
                 liveState,
+                record.ownerUserId(),
+                record.ownerUsername(),
+                record.ownerDepartmentId(),
+                record.ownerDepartmentName(),
                 record.startedAt(),
                 record.createdAt(),
                 record.updatedAt()

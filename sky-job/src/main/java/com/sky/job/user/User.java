@@ -9,6 +9,9 @@ public record User(
         String email,
         String phone,
         String avatar,
+        Long departmentId,
+        String departmentName,
+        boolean departmentEnabled,
         boolean enabled,
         LocalDateTime createdAt,
         LocalDateTime updatedAt
