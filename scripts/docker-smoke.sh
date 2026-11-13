@@ -61,7 +61,7 @@ docker run --rm --entrypoint /opt/java/openjdk/bin/java "$image" -version
 start_backend
 python3 "$root_dir/scripts/deployment-smoke.py" "http://127.0.0.1:$port" "$plugin" "$state" initialize
 # Verify persistence and restored scheduling after replacement with the same volume.
-docker top "$backend" -eo args | grep -q '/app/runner.jar'
+docker top "$backend" -eo pid,args | grep -q '/app/runner.jar'
 docker stop --time 60 "$backend" >/dev/null
 [[ $(docker inspect --format '{{.State.ExitCode}}' "$backend") != 137 ]]
 docker rm "$backend" >/dev/null
