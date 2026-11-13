@@ -26,6 +26,16 @@ spring:
             threadCount: 10
             threadPriority: 5
 
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health
+  endpoint:
+    health:
+      show-details: never
+      show-components: never
+
 mybatis:
   mapper-locations: classpath*:mapper/**/*.xml
   configuration:

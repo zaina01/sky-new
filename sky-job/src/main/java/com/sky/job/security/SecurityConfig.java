@@ -38,6 +38,7 @@ public class SecurityConfig {
                         .accessDeniedHandler(accessDeniedHandler)
                 )
                 .authorizeHttpRequests(authorize -> authorize
+                        .requestMatchers(HttpMethod.GET, "/actuator/health").permitAll()
                         .requestMatchers(HttpMethod.POST, "/user/register", "/user/login").permitAll()
                         .requestMatchers(HttpMethod.GET, "/user/me").hasAuthority(PermissionNames.USER_READ_SELF)
                         .requestMatchers(HttpMethod.POST, "/user/change-password").hasAuthority(PermissionNames.USER_PASSWORD_CHANGE_SELF)

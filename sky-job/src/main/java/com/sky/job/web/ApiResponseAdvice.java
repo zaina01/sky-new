@@ -12,7 +12,8 @@ import org.springframework.web.servlet.mvc.method.annotation.ResponseBodyAdvice;
 public class ApiResponseAdvice implements ResponseBodyAdvice<Object> {
     @Override
     public boolean supports(MethodParameter returnType, Class<? extends HttpMessageConverter<?>> converterType) {
-        return !ApiResponse.class.isAssignableFrom(returnType.getParameterType());
+        return !ApiResponse.class.isAssignableFrom(returnType.getParameterType())
+                && !returnType.getDeclaringClass().getPackageName().startsWith("org.springframework.boot.actuate.");
     }
 
     @Override

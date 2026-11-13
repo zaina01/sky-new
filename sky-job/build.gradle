@@ -21,6 +21,7 @@ dependencies {
     implementation "io.grpc:grpc-stub:${rootProject.ext.grpcVersion}"
     implementation "io.grpc:grpc-protobuf:${rootProject.ext.grpcVersion}"
     implementation 'org.springframework.boot:spring-boot-starter-web'
+    implementation 'org.springframework.boot:spring-boot-starter-actuator'
     implementation 'org.springframework.boot:spring-boot-starter-validation'
     implementation 'org.springframework.boot:spring-boot-starter-jdbc'
     implementation 'org.springframework.boot:spring-boot-starter-security'

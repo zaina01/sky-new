@@ -47,3 +47,7 @@ bin/
 
 ### Local tool settings ###
 /.claude/settings.local.json
+
+### Deployment secrets and backups ###
+/.env
+/backups/
