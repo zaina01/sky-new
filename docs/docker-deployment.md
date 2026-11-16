@@ -19,21 +19,39 @@
 
 ## 2. 准备服务器
 
-安装 Docker Engine 和 Docker Compose v2 插件（建议 2.24 或以上），确认：
+安装 Docker Engine、Docker Compose v2 插件（2.24 或以上）、curl 和 OpenSSL，确认当前用户可以运行 Docker：
 
 ```bash
 docker version
 docker compose version
 ```
 
-拉取后端仓库，或将同一版本的 `compose.yaml`、`.env.example` 和 `sql/schema-mysql.sql` 按原目录结构复制到服务器。不需要前端源码，也不需要服务器安装 Java、Node.js 或 Gradle。
+使用已发布镜像部署时，无需克隆项目，也无需安装 Java、Node.js、Gradle 或 Git。首次部署只需下载 Compose 配置、环境变量模板和初始化 SQL。以下为 Linux Bash 命令，请在新的部署目录执行，已有部署不要重复下载覆盖 `.env`：
 
 ```bash
-git clone https://github.com/zaina01/sky-new.git
+mkdir -p sky-new/sql
 cd sky-new
-cp .env.example .env
+
+curl -fSL https://raw.githubusercontent.com/zaina01/sky-new/main/compose.yaml -o compose.yaml
+curl -fSL https://raw.githubusercontent.com/zaina01/sky-new/main/.env.example -o .env
+curl -fSL https://raw.githubusercontent.com/zaina01/sky-new/main/sql/schema-mysql.sql -o sql/schema-mysql.sql
+
 chmod 600 .env
 ```
+
+确认三次下载均成功后继续。部署目录只需以下文件；Compose 按相对路径挂载 SQL，请保留目录结构：
+
+```text
+sky-new/
+├── compose.yaml
+├── .env
+└── sql/
+    └── schema-mysql.sql
+```
+
+上述 `main` 文件可用于跟随 `latest` 的部署；生产环境固定版本时，应从后端对应提交或版本下载部署配置和初始化 SQL，避免混用不同版本的文件。
+
+需要修改源码的开发者也可选择克隆仓库，然后执行 `cp .env.example .env` 和 `chmod 600 .env`；源码启动说明见 [项目 README](../README.md#本地开发)。镜像部署不需要前端源码。
 
 编辑 `.env`，填写三个必填密钥，每项可独立用 `openssl rand -hex 32` 生成：
 
@@ -49,9 +67,9 @@ SKY_HTTP_PORT=80
 
 示例文件将密钥留空，空值会使 Compose 拒绝启动；长度不足的 JWT 密钥会使应用启动失败。使用随机十六进制值可以避免 `.env` 中 `$` 插值和特殊字符引用问题。不要提交 `.env`；`docker compose config` 展开后包含密钥，检查时使用 `--quiet`。
 
-默认标签是 `latest`，生产部署建议记录两个不可变提交号或版本标签。默认数据库名为 `sky_new`、应用数据库用户为 `sky`，root 仅用于初始化、备份和恢复。
+默认标签是 `latest`，生产部署建议记录两个不可变提交号或版本标签。前后端版本独立，不能将后端提交号直接用作前端标签。默认数据库名为 `sky_new`、应用数据库用户为 `sky`，root 仅用于初始化、备份和恢复。若 80 端口被占用，可将 `.env` 中 `SKY_HTTP_PORT` 改为 `8088`，并在防火墙或云安全组中放行所选端口。
 
-GHCR 包首次发布可能为私有。可在 GitHub Packages 设置中按需要公开两个包；保持私有时，在服务器使用具有 `read:packages` 且能访问相应包的 Token 登录：
+官方两个 GHCR 应用镜像已公开，可免登录拉取，Docker 自动选择 amd64 或 arm64。自行 Fork 发布的 GHCR 包首次发布可能为私有；可在 GitHub Packages 设置中公开包。保持私有时，在服务器使用具有 `read:packages` 且能访问相应包的 Token 登录：
 
 ```bash
 read -rsp 'GHCR token: ' GHCR_TOKEN; echo
