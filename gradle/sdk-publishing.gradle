@@ -1,0 +1,80 @@
+import org.gradle.api.publish.maven.tasks.PublishToMavenRepository
+
+// Only the two SDK projects apply this script. Host/Runner versions stay unchanged.
+version = providers.gradleProperty('sdkVersion').get()
+
+mavenPublishing {
+    coordinates(project.group.toString(), project.name, project.version.toString())
+    publishToMavenCentral(false)
+    signAllPublications()
+
+    pom {
+        name = project.name
+        description = project.description
+        inceptionYear = '2026'
+        url = 'https://github.com/zaina01/sky-new'
+        licenses {
+            license {
+                name = 'MIT License'
+                url = 'https://opensource.org/license/mit/'
+                distribution = 'repo'
+            }
+        }
+        developers {
+            developer {
+                id = 'zaina01'
+                name = 'zaina01'
+                url = 'https://github.com/zaina01'
+            }
+        }
+        scm {
+            url = 'https://github.com/zaina01/sky-new'
+            connection = 'scm:git:https://github.com/zaina01/sky-new.git'
+            developerConnection = 'scm:git:ssh://git@github.com/zaina01/sky-new.git'
+        }
+    }
+}
+
+// Local staging and Maven Local work without credentials. Central upload below
+// explicitly requires an in-memory signing key; private keys never enter the repo.
+signing {
+    required = providers.gradleProperty('signingInMemoryKey').map { !it.isBlank() }.orElse(false)
+}
+
+publishing {
+    repositories {
+        maven {
+            name = 'sdkStaging'
+            url = rootProject.layout.buildDirectory.dir('sdk-repository')
+        }
+    }
+}
+
+tasks.withType(Javadoc).configureEach {
+    options.encoding = 'UTF-8'
+    options.charSet = 'UTF-8'
+}
+
+def validateCentralRelease = tasks.register('validateCentralRelease') {
+    group = 'verification'
+    description = 'Checks the SDK release version and required Central publishing credentials.'
+    doLast {
+        String releaseVersion = project.version.toString()
+        if (!(releaseVersion ==~ /\d+\.\d+\.\d+(?:-[0-9A-Za-z][0-9A-Za-z.-]*)?/) ||
+                releaseVersion.toUpperCase(Locale.ROOT).endsWith('-SNAPSHOT')) {
+            throw new GradleException('Central releases require -PsdkVersion=<release>, for example 1.0.0 (no SNAPSHOT).')
+        }
+        ['mavenCentralUsername', 'mavenCentralPassword', 'signingInMemoryKey'].each { propertyName ->
+            if (!providers.gradleProperty(propertyName).isPresent() ||
+                    providers.gradleProperty(propertyName).get().isBlank()) {
+                throw new GradleException("Missing ORG_GRADLE_PROJECT_${propertyName}; see docs/maven-central-publishing.md")
+            }
+        }
+    }
+}
+
+tasks.withType(PublishToMavenRepository).configureEach {
+    if (name.endsWith('ToMavenCentralRepository')) {
+        dependsOn validateCentralRelease
+    }
+}

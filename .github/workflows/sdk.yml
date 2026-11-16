@@ -1,0 +1,97 @@
+name: SDK Maven Central
+
+on:
+  pull_request:
+    paths:
+      - 'build.gradle'
+      - 'settings.gradle'
+      - 'gradle.properties'
+      - 'gradle/**'
+      - 'sky-plugin-api/**'
+      - 'sky-plugin-protocol/**'
+      - 'scripts/verify-sdk-publication.py'
+      - '.github/workflows/sdk.yml'
+  push:
+    branches: [main, master]
+    tags: ['sdk-v*']
+    paths:
+      - 'build.gradle'
+      - 'settings.gradle'
+      - 'gradle.properties'
+      - 'gradle/**'
+      - 'sky-plugin-api/**'
+      - 'sky-plugin-protocol/**'
+      - 'scripts/verify-sdk-publication.py'
+      - '.github/workflows/sdk.yml'
+  workflow_dispatch:
+    inputs:
+      sdk_version:
+        description: 'SDK release version, for example 1.0.0 (no SNAPSHOT)'
+        required: true
+        default: '1.0.0'
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  checks:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '25'
+      - uses: gradle/actions/setup-gradle@v4
+      - name: Tests and unsigned SDK staging
+        run: bash ./gradlew --no-daemon -PsdkVersion=1.0.0-SNAPSHOT test stageSdk
+      - name: Verify SDK publications
+        run: python3 scripts/verify-sdk-publication.py build/sdk-repository 1.0.0-SNAPSHOT
+
+  upload:
+    needs: checks
+    if: startsWith(github.ref, 'refs/tags/sdk-v') || (github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch))
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    concurrency:
+      group: sdk-central-upload
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '25'
+      - uses: gradle/actions/setup-gradle@v4
+      - name: Resolve release version
+        env:
+          INPUT_SDK_VERSION: ${{ inputs.sdk_version }}
+        run: |
+          if [[ "$GITHUB_REF" == refs/tags/sdk-v* ]]; then
+            sdk_version="${GITHUB_REF_NAME#sdk-v}"
+          else
+            sdk_version="$INPUT_SDK_VERSION"
+          fi
+          if [[ ! "$sdk_version" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z][0-9A-Za-z.-]*)?$ ]] || [[ "${sdk_version^^}" == *-SNAPSHOT ]]; then
+            echo 'Provide a release version such as 1.0.0; SNAPSHOT is not accepted.'
+            exit 1
+          fi
+          echo "SDK_VERSION=$sdk_version" >> "$GITHUB_ENV"
+      - name: Sign and upload SDK to Central Portal
+        env:
+          ORG_GRADLE_PROJECT_mavenCentralUsername: ${{ secrets.MAVEN_CENTRAL_USERNAME }}
+          ORG_GRADLE_PROJECT_mavenCentralPassword: ${{ secrets.MAVEN_CENTRAL_PASSWORD }}
+          ORG_GRADLE_PROJECT_signingInMemoryKey: ${{ secrets.SIGNING_KEY }}
+          ORG_GRADLE_PROJECT_signingInMemoryKeyPassword: ${{ secrets.SIGNING_PASSWORD }}
+        run: |
+          bash ./gradlew --no-daemon "-PsdkVersion=$SDK_VERSION" \
+            :sky-plugin-protocol:validateCentralRelease :sky-plugin-api:validateCentralRelease \
+            stageSdk
+          python3 scripts/verify-sdk-publication.py build/sdk-repository "$SDK_VERSION" --require-signatures
+          bash ./gradlew --no-daemon "-PsdkVersion=$SDK_VERSION" \
+            :sky-plugin-protocol:publishToMavenCentral :sky-plugin-api:publishToMavenCentral
+      - name: Publication instructions
+        run: |
+          echo "SDK $SDK_VERSION uploaded. Review validation and click Publish in Central Portal." >> "$GITHUB_STEP_SUMMARY"
+          echo 'https://central.sonatype.com/publishing/deployments' >> "$GITHUB_STEP_SUMMARY"

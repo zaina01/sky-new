@@ -203,6 +203,7 @@ bash ./gradlew :plugin-demo:jar
 
 - [Docker Compose 部署与运维](docs/docker-deployment.md)
 - [Java 插件开发](PLUGIN_DEVELOPMENT.md)
+- [插件 SDK 发布到 Maven Central](docs/maven-central-publishing.md)
 - [前后端联调与集成验收](docs/frontend-backend-integration.md)
 - [Vue 前端仓库](https://github.com/zaina01/sky-vue-new)
 - [镜像构建与发布记录](https://github.com/zaina01/sky-new/actions/workflows/docker.yml)

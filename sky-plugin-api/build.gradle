@@ -1,18 +1,12 @@
 plugins {
     id 'java-library'
-    id 'maven-publish'
+    id 'com.vanniktech.maven.publish'
 }
+
+description = 'Public Java API and annotations for Sky plugins.'
+apply from: rootProject.file('gradle/sdk-publishing.gradle')
 
 dependencies {
     api project(':sky-plugin-protocol')
     api "org.slf4j:slf4j-api:${rootProject.ext.slf4jVersion}"
-}
-
-publishing {
-    publications {
-        mavenJava(MavenPublication) {
-            from components.java
-            artifactId = 'sky-plugin-api'
-        }
-    }
 }

@@ -9,10 +9,18 @@ plugins {
     id 'com.google.protobuf' version '0.9.5' apply false
     id 'org.springframework.boot' version '3.5.7' apply false
     id 'io.spring.dependency-management' version '1.1.7' apply false
+    id 'com.vanniktech.maven.publish' version '0.37.0' apply false
 }
 
 group = 'io.github.zaina01'
 version = '1.0-SNAPSHOT'
+
+tasks.register('stageSdk') {
+    group = 'publishing'
+    description = 'Stages both SDK modules in build/sdk-repository without contacting Maven Central.'
+    dependsOn ':sky-plugin-protocol:publishAllPublicationsToSdkStagingRepository',
+            ':sky-plugin-api:publishAllPublicationsToSdkStagingRepository'
+}
 
 ext.mergeServiceFilesIntoJar = { jarTaskProvider ->
     def targetProject = jarTaskProvider.get().project

@@ -1009,10 +1009,18 @@ dependencies {
 独立插件工程可以使用已发布或本地安装的 `sky-plugin-api`，原则是：
 
 ```gradle
+repositories {
+    mavenCentral()
+}
+
 dependencies {
     compileOnly 'io.github.zaina01:sky-plugin-api:<version>'
 }
 ```
+
+将 `<version>` 替换为已经发布、且与目标平台兼容的 SDK 版本。API 与 protocol 共用独立的 `sdkVersion`，不要使用主程序或 Docker 镜像标签作为 Maven 版本。
+
+尚未发布时，可在平台源码根目录运行 `:sky-plugin-protocol:publishToMavenLocal :sky-plugin-api:publishToMavenLocal`，然后在独立插件工程的仓库配置中加入 `mavenLocal()`；默认本地 SDK 版本为 `1.0.0-SNAPSHOT`。维护者的签名、Central 上传和 GitHub Actions 操作见 [SDK 发布文档](docs/maven-central-publishing.md)。
 
 如果使用 SLF4J API：
 
