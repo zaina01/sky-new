@@ -1,12 +1,12 @@
 # Sky New
 
-基于 Java 25、Spring Boot 和 Quartz 的插件任务调度平台，提供插件上传、定时执行、配置与账户管理、执行日志、通知和权限管理。Java 插件由平台启动独立 Runner 进程，通过 gRPC 与主程序通信。
+基于 Java 25、Spring Boot 和 Quartz 的插件任务调度平台，支持 Java 插件、JavaScript / Python SDK 插件和单文件脚本，提供插件上传、定时执行、配置与账户管理、执行日志、通知和权限管理。平台通过独立 Runner 进程执行插件。
 
 本仓库包含后端、插件 API、Runner 和 Docker Compose 部署配置。Vue 3 管理界面位于独立仓库 [sky-vue-new](https://github.com/zaina01/sky-vue-new)。
 
 ## 主要功能
 
-- **插件管理**：上传 Java 插件 JAR，解析插件元数据及配置、账户 Schema，管理插件定义、安装实例、依赖和运行状态。
+- **插件管理**：上传 Java JAR、JS/Python SDK ZIP 或 `.js`/`.mjs`/`.py` 单文件，管理插件定义、安装实例、依赖和运行状态；SDK 插件支持配置与账户 Schema，单文件脚本支持实例变量和启动参数。
 - **任务调度**：基于 Quartz 配置 Cron 定时任务，支持手动执行、执行超时和并发策略。
 - **执行日志**：查看任务状态、执行结果和 Runner 日志，定位插件运行问题。
 - **配置与账户**：通过 Schema 表单管理插件配置和账户，支持账户分组、批量操作、文件导入导出及列表列设置。
@@ -64,19 +64,21 @@ sky-new/
 
 ### 3. 设置密钥和端口
 
-编辑 `.env`，填写以下三个必填项。每项分别执行一次 `openssl rand -hex 32`，将生成的不同随机值填入对应位置：
+编辑 `.env`，填写四个必填项。数据库密码和 JWT 密钥分别使用独立的 `openssl rand -hex 32`；脚本变量加密密钥使用 `openssl rand -base64 32`：
 
 ```bash
 openssl rand -hex 32
+openssl rand -base64 32
 ```
 
 ```dotenv
 SKY_DB_PASSWORD=填写独立生成的数据库应用用户密码
 MYSQL_ROOT_PASSWORD=填写独立生成的数据库root密码
 SKY_JWT_SECRET=填写独立生成的JWT密钥
+SKY_SCRIPT_ENV_ENCRYPTION_KEY=填写独立生成的32字节Base64密钥
 ```
 
-密钥不可留空，JWT 密钥至少为 32 字节。使用上述随机十六进制值可避免 `.env` 特殊字符插值问题。请妥善保存 `.env`。
+密钥不可留空，JWT 密钥至少为 32 字节；脚本变量密钥解码后必须恰好 32 字节。请妥善保存权限为 `600` 的 `.env`，更新和重建容器时保持原加密密钥不变，随数据库备份安全保管。已有加密变量的旧部署需沿用原有效密钥，不能直接生成新值替换；详见 [单文件脚本升级说明](docs/standalone-scripts.md)。
 
 | 配置项 | 默认值 | 用途 |
 | --- | --- | --- |
@@ -197,12 +199,16 @@ bash ./gradlew :plugin-demo:jar
 | `sky-plugin-api` | 插件公共接口、注解及配置、账户、通知和服务调用 API |
 | `sky-plugin-protocol` | 主程序与 Runner 共用的 Protobuf / gRPC 协议 |
 | `sky-plugin-runner-java` | 加载上传的 Java 插件并执行任务或服务调用的独立进程 |
+| `sky-plugin-runner-node` / `sky-plugin-runner-python` | JS/Python SDK 与单文件脚本的原生运行器 |
 | `plugin-demo` | 插件示例，演示配置、账户、日志和服务调用 |
+| `plugin-demo-node` / `plugin-demo-python` / `plugin-demo-standalone` | 两种 SDK ZIP 与单文件脚本示例 |
 
 ## 相关文档
 
 - [Docker Compose 部署与运维](docs/docker-deployment.md)
-- [Java 插件开发](PLUGIN_DEVELOPMENT.md)
+- [插件开发入口与 Java 开发](PLUGIN_DEVELOPMENT.md)
+- [JavaScript / Python SDK 开发](docs/script-plugins.md)
+- [单文件脚本开发、变量与参数](docs/standalone-scripts.md)
 - [插件 SDK 发布到 Maven Central](docs/maven-central-publishing.md)
 - [前后端联调与集成验收](docs/frontend-backend-integration.md)
 - [Vue 前端仓库](https://github.com/zaina01/sky-vue-new)

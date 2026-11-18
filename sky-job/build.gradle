@@ -29,6 +29,8 @@ dependencies {
     implementation 'org.mybatis.spring.boot:mybatis-spring-boot-starter:3.0.5'
     implementation "tools.jackson.core:jackson-databind:${rootProject.ext.jacksonVersion}"
     implementation 'org.ow2.asm:asm:9.8'
+    implementation 'org.apache.commons:commons-compress:1.28.0'
+    implementation 'net.java.dev.jna:jna:5.17.0'
     implementation 'org.apache.maven.resolver:maven-resolver-supplier:2.0.0-alpha-6'
     implementation 'org.apache.commons:commons-csv:1.10.0'
     implementation 'org.apache.poi:poi-ooxml:5.5.1'
@@ -71,8 +73,19 @@ tasks.register('frontendIntegrationDependencyJar', Jar) {
 
 tasks.named('test') {
     useJUnitPlatform {
-        excludeTags 'frontend-integration'
+        excludeTags 'frontend-integration', 'native-integration'
     }
+}
+
+tasks.register('nativeScriptIntegrationTest', Test) {
+    group = 'verification'
+    description = 'Tests native dependency environments using real npm/pip in temporary directories (network required).'
+    testClassesDirs = sourceSets.test.output.classesDirs
+    classpath = sourceSets.test.runtimeClasspath
+    useJUnitPlatform { includeTags 'native-integration' }
+    maxParallelForks = 1
+    systemProperty 'sky.script.workspace', rootProject.projectDir.absolutePath
+    dependsOn tasks.named('testClasses')
 }
 
 def frontendIntegrationPluginJarTask = tasks.named('frontendIntegrationPluginJar', Jar)

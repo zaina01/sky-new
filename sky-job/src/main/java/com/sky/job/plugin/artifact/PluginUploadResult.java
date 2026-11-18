@@ -8,6 +8,22 @@ public record PluginUploadResult(
         String mainClass,
         String artifactSha256,
         Path artifactPath,
-        int resolvedDependencyCount
+        int resolvedDependencyCount,
+        String runtimeEngine,
+        String entryPoint,
+        String executionMode
 ) {
+    public PluginUploadResult(
+        String pluginId,
+        String version,
+        String mainClass,
+        String artifactSha256,
+        Path artifactPath,
+        int resolvedDependencyCount,
+        String runtimeEngine,
+        String entryPoint
+    ) {
+        this(pluginId, version, mainClass, artifactSha256, artifactPath, resolvedDependencyCount, runtimeEngine, entryPoint, "plugin");
+    }
+
 }

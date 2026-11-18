@@ -9,6 +9,8 @@
 **/build
 **/out
 **/node_modules
+**/__pycache__
+**/.venv
 data
 backups
 **/.env

@@ -14,4 +14,7 @@ public interface PluginRuntimeHandle {
     String token();
 
     Path logPath();
+
+    default String environmentRevision() { return ""; }
+    default String interpreterVersion() { return ""; }
 }

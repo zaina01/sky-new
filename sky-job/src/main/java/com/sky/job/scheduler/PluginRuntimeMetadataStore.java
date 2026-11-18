@@ -111,7 +111,7 @@ public class PluginRuntimeMetadataStore {
                 capabilities,
                 row.remoteDebugEnabled(),
                 row.remoteDebugPort(),
-                row.remoteDebugSuspend()
+                row.remoteDebugSuspend(), row.runtimeEngine(), row.entryPoint(), row.executionMode()
         );
     }
 
@@ -145,7 +145,7 @@ public class PluginRuntimeMetadataStore {
                 row.ownerDepartmentName(),
                 row.startedAt(),
                 row.createdAt(),
-                row.updatedAt()
+                row.updatedAt(), row.runtimeEngine(), row.entryPoint(), row.executionMode()
         );
     }
 

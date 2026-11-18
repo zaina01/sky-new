@@ -38,6 +38,7 @@ public class SecurityConfig {
                         .accessDeniedHandler(accessDeniedHandler)
                 )
                 .authorizeHttpRequests(authorize -> authorize
+                        .requestMatchers("/plugins/script-environments", "/plugins/script-environments/**").hasRole("ADMIN")
                         .requestMatchers(HttpMethod.GET, "/actuator/health").permitAll()
                         .requestMatchers(HttpMethod.POST, "/user/register", "/user/login").permitAll()
                         .requestMatchers(HttpMethod.GET, "/user/me").hasAuthority(PermissionNames.USER_READ_SELF)
@@ -96,6 +97,8 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.POST, "/plugin-service/permissions", "/plugin-service/permissions/batch").hasAuthority(PermissionNames.PLUGIN_SERVICE_PERMISSION_WRITE)
                         .requestMatchers(HttpMethod.PATCH, "/plugin-service/permissions/*/enabled").hasAuthority(PermissionNames.PLUGIN_SERVICE_PERMISSION_WRITE)
                         .requestMatchers(HttpMethod.DELETE, "/plugin-service/permissions/*").hasAuthority(PermissionNames.PLUGIN_SERVICE_PERMISSION_WRITE)
+                        .requestMatchers(HttpMethod.GET, "/plugins/installations/*/script-environment-variables", "/plugins/installations/*/script-arguments", "/plugins/installations/*/script-environment-settings").hasAuthority(PermissionNames.PLUGIN_CONFIG_READ)
+                        .requestMatchers("/plugins/installations/*/script-environment-variables", "/plugins/installations/*/script-environment-variables/**", "/plugins/installations/*/script-arguments", "/plugins/installations/*/script-environment-settings").hasAuthority(PermissionNames.PLUGIN_CONFIG_WRITE)
                         .requestMatchers(HttpMethod.GET, "/plugins/installations/*/config").hasAuthority(PermissionNames.PLUGIN_CONFIG_READ)
                         .requestMatchers(HttpMethod.PUT, "/plugins/installations/*/config").hasAuthority(PermissionNames.PLUGIN_CONFIG_WRITE)
                         .requestMatchers(HttpMethod.GET, "/plugins/installations/*/accounts/**").hasAuthority(PermissionNames.PLUGIN_ACCOUNT_READ)

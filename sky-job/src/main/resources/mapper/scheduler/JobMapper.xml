@@ -33,6 +33,7 @@
             <arg column="updated_by" javaType="java.lang.String"/>
             <arg column="created_at" javaType="java.time.LocalDateTime"/>
             <arg column="updated_at" javaType="java.time.LocalDateTime"/>
+            <arg column="execution_mode" javaType="java.lang.String"/>
         </constructor>
     </resultMap>
 
@@ -42,7 +43,7 @@
         j.misfire_policy, j.concurrent, j.input_json, j.timeout_millis,
         j.executed_status, j.remark, j.owner_user_id, u.username AS owner_username,
         j.owner_dept_id AS owner_department_id, dept.department_name AS owner_department_name,
-        j.created_by, j.updated_by, j.created_at, j.updated_at
+        j.created_by, j.updated_by, j.created_at, j.updated_at, d.execution_mode
     </sql>
 
     <sql id="joins">

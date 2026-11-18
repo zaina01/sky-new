@@ -17,6 +17,12 @@ public record CreateJobRequest(
         String remark,
         List<@NotBlank String> notificationChannelIds
 ) {
+
+    @com.fasterxml.jackson.annotation.JsonAnySetter
+    public void unknown(String name, com.fasterxml.jackson.databind.JsonNode value) {
+        if ("scriptOptions".equals(name) && value != null && !value.isNull() && !(value.isObject() && value.isEmpty()))
+            throw new IllegalArgumentException("Job scriptOptions is no longer supported; configure environment and arguments on the installation");
+    }
     public CreateJobRequest {
         notificationChannelIds = notificationChannelIds == null ? List.of() : List.copyOf(notificationChannelIds);
     }

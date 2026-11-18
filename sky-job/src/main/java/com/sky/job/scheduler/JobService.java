@@ -78,10 +78,11 @@ public class JobService {
     @Transactional
     public JobResponse create(CreateJobRequest request, AuthenticatedUser user, HttpServletRequest httpRequest) {
         cronUtils.validate(request.cronExpression());
-        requireTaskInstallation(request.pluginInstallationId(), user, PermissionNames.JOB_WRITE);
+        var installation=requireTaskInstallation(request.pluginInstallationId(), user, PermissionNames.JOB_WRITE);
         List<String> channelIds = request.notificationChannelIds().stream().distinct().toList();
         validateJobChannels(request.pluginInstallationId(), channelIds, user);
         long id = jobStore.insert(request.jobName(), request.pluginInstallationId(), request.cronExpression(), request.misfirePolicy(), request.concurrent(), request.inputJson(), request.timeoutMillis(), request.remark(), user.userId(), user.departmentId(), user.username());
+        if("standalone".equals(installation.executionMode()))com.sky.job.plugin.script.ScriptOptionsValidation.validateInput(request.inputJson());
         jobStore.replaceNotificationChannels(id, channelIds, user.username());
         ScheduledJob job = getJobUnscoped(id);
         quartzJobUtils.schedule(job);
@@ -93,10 +94,11 @@ public class JobService {
     public JobResponse update(long id, UpdateJobRequest request, AuthenticatedUser user, HttpServletRequest httpRequest) {
         ScheduledJob previous = getJob(id, user, PermissionNames.JOB_WRITE);
         cronUtils.validate(request.cronExpression());
-        requireTaskInstallation(request.pluginInstallationId(), user, PermissionNames.JOB_WRITE);
+        var installation=requireTaskInstallation(request.pluginInstallationId(), user, PermissionNames.JOB_WRITE);
         if (!previous.pluginInstallationId().equals(request.pluginInstallationId())) {
             validateJobChannels(request.pluginInstallationId(), jobStore.notificationChannelIds(id), user);
         }
+        if("standalone".equals(installation.executionMode()))com.sky.job.plugin.script.ScriptOptionsValidation.validateInput(request.inputJson());
         jobStore.update(id, request.jobName(), request.pluginInstallationId(), request.cronExpression(), request.misfirePolicy(), request.concurrent(), request.inputJson(), request.timeoutMillis(), request.remark(), user.username());
         ScheduledJob job = getJobUnscoped(id);
         quartzJobUtils.reschedule(job);

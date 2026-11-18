@@ -36,6 +36,7 @@ import java.util.UUID;
 public class JobExecutionService {
     private static final Logger log = LoggerFactory.getLogger(JobExecutionService.class);
 
+    private final com.sky.job.plugin.script.InstallationScriptOptionsStore scriptOptions;
     private final JobStore jobStore;
     private final JobExecutionStore executionStore;
     private final PluginRuntimeMetadataStore runtimeMetadataStore;
@@ -52,6 +53,7 @@ public class JobExecutionService {
     private final int hostGrpcPort;
 
     public JobExecutionService(
+            com.sky.job.plugin.script.InstallationScriptOptionsStore scriptOptions,
             JobStore jobStore,
             JobExecutionStore executionStore,
             PluginRuntimeMetadataStore runtimeMetadataStore,
@@ -67,6 +69,7 @@ public class JobExecutionService {
             NotificationService notificationService,
             @Value("${sky.plugin.host-grpc.port}") int hostGrpcPort
     ) {
+        this.scriptOptions=scriptOptions;
         this.jobStore = jobStore;
         this.executionStore = executionStore;
         this.runtimeMetadataStore = runtimeMetadataStore;
@@ -124,6 +127,11 @@ public class JobExecutionService {
         ActiveJobExecution active = null;
         String requestId = "";
         try {
+            executionStore.updateRuntimeSnapshot(executionId, metadata.runtimeEngine(), metadata.artifactSha256(), "", "", metadata.executionMode());
+            boolean standalone="standalone".equals(metadata.executionMode());
+            if(standalone)com.sky.job.plugin.script.ScriptOptionsValidation.validateInput(inputJson);
+            var options=standalone?scriptOptions.snapshot(job.pluginInstallationId()):null;
+            if(options!=null)executionStore.updateScriptOptionsRevision(executionId,options.revision());
             PluginRuntimeSpec spec = new PluginRuntimeSpec(
                     metadata.installationId(),
                     metadata.pluginId(),
@@ -131,7 +139,10 @@ public class JobExecutionService {
                     metadata.mainClass(),
                     metadata.artifactPath(),
                     metadata.artifactSha256(),
-                    workDir(metadata.pluginId(), metadata.installationId(), instanceId),
+                    "java".equals(metadata.runtimeEngine())
+                            ? workDir(metadata.pluginId(), metadata.installationId(), instanceId)
+                            // Generated script IDs make the nested instance path exceed Windows' cwd limit.
+                            : runtimeProperties.workRoot().resolve("scripts").resolve(runId),
                     hostGrpcPort,
                     metadata.dependencyPaths(),
                     metadata.capabilities(),
@@ -140,10 +151,12 @@ public class JobExecutionService {
                     metadata.remoteDebugSuspend(),
                     runId,
                     job.id(),
-                    executionId
+                    executionId, metadata.runtimeEngine(), metadata.entryPoint(), metadata.executionMode()
             );
             handle = runtimeAdapter.start(spec);
+            executionStore.updateRuntimeSnapshot(executionId, metadata.runtimeEngine(), metadata.artifactSha256(), handle.environmentRevision(), handle.interpreterVersion(), metadata.executionMode());
             var request = requestFactory.create(job.pluginId(), Long.toString(job.id()), job.jobName(), timeoutMillis, inputJson);
+            if(options!=null)request=request.toBuilder().setStandaloneOptions(options.options()).build();
             requestId = request.getRequestId();
             executionStore.updateRequestId(executionId, requestId);
             active = new ActiveJobExecution(executionId, job.id(), job.jobName(), job.pluginInstallationId(), job.pluginId(), instanceId, requestId, triggerType, handle, startedAt, timeoutMillis);

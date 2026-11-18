@@ -46,6 +46,7 @@ services:
       SKY_DB_USERNAME: sky
       SKY_DB_PASSWORD: ${SKY_DB_PASSWORD:?Set SKY_DB_PASSWORD in .env}
       SKY_JWT_SECRET: ${SKY_JWT_SECRET:?Set SKY_JWT_SECRET in .env (at least 32 bytes)}
+      SKY_SCRIPT_ENV_ENCRYPTION_KEY: ${SKY_SCRIPT_ENV_ENCRYPTION_KEY:?Set SKY_SCRIPT_ENV_ENCRYPTION_KEY in .env (Base64 encoded 32 random bytes; retain across updates)}
       SKY_PLUGIN_JAVA_COMMAND: /opt/java/openjdk/bin/java
       SKY_PLUGIN_RUNNER_JAR: /app/runner.jar
       SKY_PLUGIN_STORAGE_ROOT: /app/data/plugins

@@ -73,6 +73,17 @@ sky:
     jwt-expiration: ${SKY_JWT_EXPIRATION:86400}
     jwt-issuer: ${SKY_JWT_ISSUER:sky-new}
   plugin:
+    script-encryption-key: ${SKY_SCRIPT_ENV_ENCRYPTION_KEY:}
+    script:
+      root: ${SKY_PLUGIN_SCRIPT_ROOT:./data/plugins/script-environments}
+      node-command: ${SKY_PLUGIN_NODE_COMMAND:node}
+      python-command: ${SKY_PLUGIN_PYTHON_COMMAND:python}
+      npm-cli: ${SKY_PLUGIN_NPM_CLI:}
+      node-runner: ${SKY_PLUGIN_NODE_RUNNER:./sky-plugin-runner-node/runner.mjs}
+      python-runner: ${SKY_PLUGIN_PYTHON_RUNNER:./sky-plugin-runner-python/runner.py}
+      max-processes: ${SKY_PLUGIN_SCRIPT_MAX_PROCESSES:8}
+      max-log-bytes: ${SKY_PLUGIN_SCRIPT_MAX_LOG_BYTES:10485760}
+      install-timeout: ${SKY_PLUGIN_SCRIPT_INSTALL_TIMEOUT:10m}
     host-grpc:
       bind-host: ${SKY_HOST_GRPC_BIND_HOST:127.0.0.1}
       port: ${SKY_HOST_GRPC_PORT:19090}

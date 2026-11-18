@@ -35,6 +35,12 @@
             <arg column="owner_user_id" javaType="java.lang.String"/>
             <arg column="owner_dept_id" javaType="java.lang.Long"/>
             <arg column="created_at" javaType="java.time.LocalDateTime"/>
+            <arg column="runtime_engine" javaType="java.lang.String"/>
+            <arg column="artifact_sha256" javaType="java.lang.String"/>
+            <arg column="environment_revision" javaType="java.lang.String"/>
+            <arg column="interpreter_version" javaType="java.lang.String"/>
+            <arg column="execution_mode" javaType="java.lang.String"/>
+            <arg column="script_options_revision" javaType="java.lang.String"/>
         </constructor>
     </resultMap>
 
@@ -64,6 +70,8 @@
             #{jobName}, #{runnerLogPath}, #{ownerUserId}, #{ownerDepartmentId}
         )
     </insert>
+    <update id="updateRuntimeSnapshot">UPDATE job_execution SET runtime_engine=#{engine}, artifact_sha256=#{sha}, environment_revision=#{revision}, interpreter_version=#{version}, execution_mode=#{mode} WHERE id=#{id}</update>
+    <update id="updateScriptOptionsRevision">UPDATE job_execution SET script_options_revision=#{revision} WHERE id=#{id}</update>
     <update id="updateRequestId">UPDATE job_execution SET request_id = #{requestId} WHERE id = #{id}</update>
     <update id="markTerminal">
         UPDATE job_execution SET status=#{status}, message=#{message}, result_json=CAST(#{resultJson} AS JSON),

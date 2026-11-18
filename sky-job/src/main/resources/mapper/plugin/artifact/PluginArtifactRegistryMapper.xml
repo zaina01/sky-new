@@ -6,12 +6,13 @@
     <insert id="upsertDefinition">
         INSERT INTO plugin_definition (
             plugin_id, version, display_name, main_class, artifact_path, artifact_sha256,
-            capabilities_json, config_schema_json, account_schema_json, dependency_jars_json, uploaded_by
+            capabilities_json, config_schema_json, account_schema_json, dependency_jars_json, uploaded_by, runtime_engine, entry_point, execution_mode
         ) VALUES (
             #{pluginId}, #{version}, #{displayName}, #{mainClass}, #{artifactPath}, #{artifactSha256},
-            CAST(#{capabilitiesJson} AS JSON), CAST(#{configSchemaJson} AS JSON), CAST(#{accountSchemaJson} AS JSON), CAST(#{dependencyJarsJson} AS JSON), #{uploadedBy}
+            CAST(#{capabilitiesJson} AS JSON), CAST(#{configSchemaJson} AS JSON), CAST(#{accountSchemaJson} AS JSON), CAST(#{dependencyJarsJson} AS JSON), #{uploadedBy}, #{runtimeEngine}, #{entryPoint}, #{executionMode}
         )
         ON DUPLICATE KEY UPDATE
+            execution_mode = VALUES(execution_mode), runtime_engine = VALUES(runtime_engine), entry_point = VALUES(entry_point),
             version = VALUES(version), display_name = VALUES(display_name),
             main_class = VALUES(main_class), artifact_path = VALUES(artifact_path), artifact_sha256 = VALUES(artifact_sha256),
             capabilities_json = VALUES(capabilities_json),
@@ -41,6 +42,9 @@
             <arg column="uploaded_by" javaType="java.lang.String"/>
             <arg column="created_at" javaType="java.time.LocalDateTime"/>
             <arg column="updated_at" javaType="java.time.LocalDateTime"/>
+            <arg column="runtime_engine" javaType="java.lang.String"/>
+            <arg column="entry_point" javaType="java.lang.String"/>
+            <arg column="execution_mode" javaType="java.lang.String"/>
         </constructor>
     </resultMap>
     <select id="findDefinition" resultMap="PluginDefinitionResultMap">SELECT * FROM plugin_definition WHERE plugin_id = #{pluginId}</select>

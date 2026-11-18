@@ -21,7 +21,7 @@ public class ProcessPluginRuntimeValidator {
 
     public void validate(PluginRuntimeSpec spec) {
         Path runnerJar = properties.runnerJar().toAbsolutePath().normalize();
-        if (!Files.isRegularFile(runnerJar) || !runnerJar.getFileName().toString().endsWith(".jar")) {
+        if ("java".equals(spec.runtimeEngine()) && (!Files.isRegularFile(runnerJar) || !runnerJar.getFileName().toString().endsWith(".jar"))) {
             throw new IllegalArgumentException("Plugin runner jar is not a regular jar file: " + runnerJar);
         }
         Path artifact = requireUnderRoot(spec.artifactPath(), properties.artifactRoot(), "artifact");

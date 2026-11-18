@@ -17,6 +17,23 @@ import java.util.stream.Collectors;
 
 @RestControllerAdvice
 public class GlobalExceptionHandler {
+    @ExceptionHandler(org.springframework.dao.DataAccessException.class)
+    public ResponseEntity<ApiResponse<Void>> databaseFailure(org.springframework.dao.DataAccessException exception) {
+        // Keep database failures out of the authenticated /error redispatch and avoid exposing SQL or values.
+        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                .body(ApiResponse.error(500001, "Database operation failed"));
+    }
+
+    @ExceptionHandler(org.springframework.http.converter.HttpMessageNotReadableException.class)
+    public ResponseEntity<ApiResponse<Void>> invalidJson(org.springframework.http.converter.HttpMessageNotReadableException exception) {
+        String message="Invalid request JSON";
+        for(Throwable cause=exception;cause!=null;cause=cause.getCause()) {
+            if(cause instanceof IllegalArgumentException && "Job scriptOptions is no longer supported; configure environment and arguments on the installation".equals(cause.getMessage())) {
+                message=cause.getMessage();break;
+            }
+        }
+        return ResponseEntity.badRequest().body(ApiResponse.error(400001,message));
+    }
     @ExceptionHandler(ResourceNotFoundException.class)
     public ResponseEntity<ApiResponse<Void>> notFound(ResourceNotFoundException exception) {
         return ResponseEntity.status(HttpStatus.NOT_FOUND).body(ApiResponse.error(404001, exception.getMessage()));

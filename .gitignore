@@ -51,3 +51,8 @@ bin/
 ### Deployment secrets and backups ###
 /.env
 /backups/
+
+# Native runners
+node_modules/
+__pycache__/
+.venv/

@@ -5,6 +5,7 @@ import org.springframework.context.annotation.Configuration;
 
 @Configuration
 @MapperScan({
+        "com.sky.job.plugin.script.mapper",
         "com.sky.job.audit.mapper",
         "com.sky.job.notification.mapper",
         "com.sky.job.plugin.storage.mapper",

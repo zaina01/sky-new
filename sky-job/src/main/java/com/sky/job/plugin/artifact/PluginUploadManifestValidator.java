@@ -20,8 +20,17 @@ public class PluginUploadManifestValidator {
         require(ID_PATTERN.matcher(nullToEmpty(manifest.pluginId())).matches(), "Invalid pluginId");
         require(VERSION_PATTERN.matcher(nullToEmpty(manifest.version())).matches(), "Invalid plugin version");
         require(manifest.runtime() != null, "Missing runtime descriptor");
-        require("java-process".equals(manifest.runtime().type()), "Unsupported plugin runtime type");
-        require(CLASS_PATTERN.matcher(nullToEmpty(manifest.runtime().mainClass())).matches(), "Invalid plugin main class");
+        require(Set.of("plugin","standalone").contains(manifest.runtime().executionMode()),"Invalid execution mode");
+        require(Set.of("java", "node", "python").contains(manifest.runtime().engine()), "Unsupported plugin runtime type");
+        if ("java".equals(manifest.runtime().engine())) {
+            require(CLASS_PATTERN.matcher(nullToEmpty(manifest.runtime().mainClass())).matches(), "Invalid plugin main class");
+        } else {
+            if("standalone".equals(manifest.runtime().executionMode())) {
+                require(manifest.runtime().entryPoint().matches("main\\.(js|mjs|py)"),"Invalid standalone entry");
+                require(manifest.capabilities()!=null && !manifest.capabilities().config() && !manifest.capabilities().account() && !manifest.capabilities().notification(),"Standalone scripts only support task capability");
+            } else com.sky.job.plugin.script.ScriptArchive.validateEntryPoint(manifest.runtime().engine(), manifest.runtime().entryPoint());
+            require(manifest.capabilities() != null && manifest.capabilities().task() && !manifest.capabilities().service(), "Script plugins support tasks only");
+        }
         require(manifest.configSchema() == null || manifest.configSchema().isObject(), "Plugin config schema must be a JSON object");
         require(manifest.accountSchema() == null || manifest.accountSchema().isObject(), "Plugin account schema must be a JSON object");
         PluginUploadManifest.CapabilityDescriptor capabilities = manifest.capabilities();

@@ -39,11 +39,19 @@ public class PluginArtifactService {
         this.auditStore = auditStore;
     }
 
-    public PluginUploadResult upload(MultipartFile file, String actor) {
-        PluginArtifactStore.StoredArtifact storedArtifact = artifactStore.store(file);
+    public synchronized PluginUploadResult upload(MultipartFile file, String actor) {
+        return upload(file,actor,null,null,null);
+    }
+
+    public synchronized PluginUploadResult upload(MultipartFile file,String actor,String pluginId,String displayName,String version) {
+        PluginArtifactStore.StoredArtifact storedArtifact = artifactStore.store(file,pluginId,displayName,version);
         PluginUploadManifest manifest = storedArtifact.manifest();
         Set<PluginCapability> capabilities = manifestValidator.validate(manifest);
-        boolean overwriteDependencies = dependencyParser.hasDependencyDescriptor(storedArtifact.path());
+        registry.find(manifest.pluginId()).ifPresent(existing -> {
+            if (!existing.runtimeEngine().equals(manifest.runtime().engine())) throw new IllegalArgumentException("Cannot replace a plugin with a different runtime engine");
+            if (!existing.executionMode().equals(manifest.runtime().executionMode())) throw new IllegalArgumentException("Cannot replace a plugin with a different execution mode");
+        });
+        boolean overwriteDependencies = "java".equals(manifest.runtime().engine()) && dependencyParser.hasDependencyDescriptor(storedArtifact.path());
         List<PluginDependencyDeclaration> declarations = overwriteDependencies ? dependencyParser.parse(storedArtifact.path()) : List.of();
         List<ResolvedPluginDependency> dependencies = overwriteDependencies ? dependencyResolver.resolve(declarations) : List.of();
         registry.register(manifest, capabilities, storedArtifact.path(), storedArtifact.sha256(), dependencies, overwriteDependencies, actor);
@@ -54,7 +62,7 @@ public class PluginArtifactService {
                 manifest.runtime().mainClass(),
                 storedArtifact.sha256(),
                 storedArtifact.path(),
-                dependencies.size()
+                dependencies.size(), manifest.runtime().engine(), manifest.runtime().entryPoint(), manifest.runtime().executionMode()
         );
     }
 }

@@ -99,6 +99,12 @@ message TaskRunRequest {
   int64 trigger_time_epoch_millis = 5;
   int64 timeout_millis = 6;
   string input_json = 7;
+  StandaloneTaskOptions standalone_options = 8;
+}
+
+message StandaloneTaskOptions {
+  repeated string arguments = 1;
+  map<string, string> environment = 2;
 }
 
 enum TaskRunStatus {

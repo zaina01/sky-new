@@ -35,8 +35,83 @@ public record PluginRuntimeResponse(
         String ownerDepartmentName,
         LocalDateTime startedAt,
         LocalDateTime createdAt,
-        LocalDateTime updatedAt
+        LocalDateTime updatedAt,
+        String runtimeEngine,
+        String entryPoint,
+        String executionMode
 ) {
+    public PluginRuntimeResponse(
+        long id,
+        String installationId,
+        String pluginId,
+        String instanceId,
+        String installationName,
+        String version,
+        String displayName,
+        String mainClass,
+        String artifactPath,
+        String artifactSha256,
+        String runtimeType,
+        PluginRuntimeState state,
+        String runnerHost,
+        Integer runnerPort,
+        String workDir,
+        String capabilitiesJson,
+        String configSchemaJson,
+        String accountSchemaJson,
+        boolean remoteDebugEnabled,
+        int remoteDebugPort,
+        boolean remoteDebugSuspend,
+        boolean managedByCurrentHost,
+        PluginRuntimeState liveState,
+        String ownerUserId,
+        String ownerUsername,
+        Long ownerDepartmentId,
+        String ownerDepartmentName,
+        LocalDateTime startedAt,
+        LocalDateTime createdAt,
+        LocalDateTime updatedAt,
+        String runtimeEngine,
+        String entryPoint
+    ) {
+        this(id, installationId, pluginId, instanceId, installationName, version, displayName, mainClass, artifactPath, artifactSha256, runtimeType, state, runnerHost, runnerPort, workDir, capabilitiesJson, configSchemaJson, accountSchemaJson, remoteDebugEnabled, remoteDebugPort, remoteDebugSuspend, managedByCurrentHost, liveState, ownerUserId, ownerUsername, ownerDepartmentId, ownerDepartmentName, startedAt, createdAt, updatedAt, runtimeEngine, entryPoint, "plugin");
+    }
+
+    public PluginRuntimeResponse(
+        long id,
+        String installationId,
+        String pluginId,
+        String instanceId,
+        String installationName,
+        String version,
+        String displayName,
+        String mainClass,
+        String artifactPath,
+        String artifactSha256,
+        String runtimeType,
+        PluginRuntimeState state,
+        String runnerHost,
+        Integer runnerPort,
+        String workDir,
+        String capabilitiesJson,
+        String configSchemaJson,
+        String accountSchemaJson,
+        boolean remoteDebugEnabled,
+        int remoteDebugPort,
+        boolean remoteDebugSuspend,
+        boolean managedByCurrentHost,
+        PluginRuntimeState liveState,
+        String ownerUserId,
+        String ownerUsername,
+        Long ownerDepartmentId,
+        String ownerDepartmentName,
+        LocalDateTime startedAt,
+        LocalDateTime createdAt,
+        LocalDateTime updatedAt
+    ) {
+        this(id, installationId, pluginId, instanceId, installationName, version, displayName, mainClass, artifactPath, artifactSha256, runtimeType, state, runnerHost, runnerPort, workDir, capabilitiesJson, configSchemaJson, accountSchemaJson, remoteDebugEnabled, remoteDebugPort, remoteDebugSuspend, managedByCurrentHost, liveState, ownerUserId, ownerUsername, ownerDepartmentId, ownerDepartmentName, startedAt, createdAt, updatedAt, "java", mainClass);
+    }
+
     public static PluginRuntimeResponse from(PluginRuntimeRecord record, boolean managedByCurrentHost, PluginRuntimeState liveState) {
         return new PluginRuntimeResponse(
                 record.id(),
@@ -68,7 +143,7 @@ public record PluginRuntimeResponse(
                 record.ownerDepartmentName(),
                 record.startedAt(),
                 record.createdAt(),
-                record.updatedAt()
+                record.updatedAt(), record.runtimeEngine(), record.entryPoint(), record.executionMode()
         );
     }
 }

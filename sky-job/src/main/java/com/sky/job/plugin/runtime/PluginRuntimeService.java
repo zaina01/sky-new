@@ -55,6 +55,7 @@ public class PluginRuntimeService {
     private final ProcessPluginRuntimeProperties runtimeProperties;
     private final DynamicProcessPluginRuntimeSettings runtimeSettings;
     private final JobStore jobStore;
+    private final com.sky.job.plugin.script.InstallationScriptOptionsStore scriptOptions;
     private final PluginConfigStore configStore;
     private final PluginAccountStore accountStore;
     private final PluginAccountGroupStore accountGroupStore;
@@ -75,6 +76,7 @@ public class PluginRuntimeService {
             ProcessPluginRuntimeProperties runtimeProperties,
             DynamicProcessPluginRuntimeSettings runtimeSettings,
             JobStore jobStore,
+            com.sky.job.plugin.script.InstallationScriptOptionsStore scriptOptions,
             PluginConfigStore configStore,
             PluginAccountStore accountStore,
             PluginAccountGroupStore accountGroupStore,
@@ -94,6 +96,7 @@ public class PluginRuntimeService {
         this.runtimeProperties = runtimeProperties;
         this.runtimeSettings = runtimeSettings;
         this.jobStore = jobStore;
+        this.scriptOptions=scriptOptions;
         this.configStore = configStore;
         this.accountStore = accountStore;
         this.accountGroupStore = accountGroupStore;
@@ -162,6 +165,7 @@ public class PluginRuntimeService {
 
     public PluginRuntimeResponse updateDebug(String installationId, UpdatePluginRuntimeDebugRequest request, AuthenticatedUser user) {
         PluginRuntimeRecord record = scopedRecord(installationId, user, PermissionNames.PLUGIN_RUNTIME_MANAGE);
+        if (!"java".equals(record.runtimeEngine())) throw new IllegalArgumentException("Remote debugging is available for Java only");
         validateDebugRequest(request);
         if (store.updateRemoteDebug(installationId, request.enabled(), request.port(), request.suspend()) == 0) {
             throw new ResourceNotFoundException("Plugin installation not found");
@@ -205,6 +209,7 @@ public class PluginRuntimeService {
         }
         Optional<PluginRuntimeHandle> handle = registry.remove(installationId);
         handle.ifPresent(runtimeHandle -> runtimeAdapter.stop(runtimeHandle, runtimeSettings.stopTimeout()));
+        scriptOptions.deleteInstallation(installationId);
         configStore.deleteByInstallationId(installationId);
         accountStore.deleteByInstallationId(installationId);
         accountGroupStore.deleteByInstallationId(installationId);
@@ -217,6 +222,7 @@ public class PluginRuntimeService {
 
     private PluginRuntimeResponse startInternal(String installationId, String actor, boolean auditSuccess, boolean auditFailure) {
         PluginRuntimeRecord record = record(installationId);
+        if (!"java".equals(record.runtimeEngine())) throw new IllegalArgumentException("Script runtimes are started by task executions only");
         PluginRuntimeState previousState = record.state();
         var existing = registry.get(installationId);
         if (existing.isPresent() && runtimeAdapter.inspect(existing.get()) == PluginRuntimeState.RUNNING) {
@@ -394,7 +400,7 @@ public class PluginRuntimeService {
     }
 
     private PluginOptionResponse option(PluginRuntimeRecord record) {
-        return new PluginOptionResponse(record.installationId(), record.pluginId(), record.installationName(), record.displayName(), record.version(), record.ownerUserId(), record.ownerDepartmentId(), record.state());
+        return new PluginOptionResponse(record.installationId(), record.pluginId(), record.installationName(), record.displayName(), record.version(), record.ownerUserId(), record.ownerDepartmentId(), record.state(), record.executionMode());
     }
 
     private PluginRuntimeRecord record(String installationId) {

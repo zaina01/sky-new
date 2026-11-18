@@ -233,6 +233,9 @@ CREATE TABLE IF NOT EXISTS plugin_definition (
   version VARCHAR(64) NOT NULL DEFAULT '',
   display_name VARCHAR(255) NOT NULL DEFAULT '',
   main_class VARCHAR(512) NOT NULL DEFAULT '',
+  runtime_engine VARCHAR(16) NOT NULL DEFAULT 'java',
+    execution_mode VARCHAR(16) NOT NULL DEFAULT 'plugin',
+  entry_point VARCHAR(512) NOT NULL DEFAULT '',
   artifact_path VARCHAR(1024) NOT NULL DEFAULT '',
   artifact_sha256 CHAR(64) NOT NULL DEFAULT '',
   capabilities_json JSON NOT NULL,
@@ -350,6 +353,12 @@ CREATE TABLE IF NOT EXISTS job_notification_channel (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
 CREATE TABLE IF NOT EXISTS job_execution (
+  runtime_engine VARCHAR(16) NOT NULL DEFAULT 'java',
+    execution_mode VARCHAR(16) NOT NULL DEFAULT 'plugin',
+  artifact_sha256 VARCHAR(64) NOT NULL DEFAULT '',
+  environment_revision VARCHAR(64) NOT NULL DEFAULT '',
+  interpreter_version VARCHAR(128) NOT NULL DEFAULT '',
+  script_options_revision VARCHAR(32) NOT NULL DEFAULT '',
   id BIGINT NOT NULL AUTO_INCREMENT,
   job_id BIGINT NOT NULL,
   plugin_installation_id VARCHAR(64) NOT NULL,
@@ -619,3 +628,29 @@ CREATE TABLE IF NOT EXISTS plugin_audit_log (
   KEY idx_plugin_audit_plugin (plugin_id, created_at),
   KEY idx_plugin_audit_action (action, created_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+CREATE TABLE IF NOT EXISTS script_environment_document (
+  document_key VARCHAR(192) NOT NULL PRIMARY KEY,
+  document_json JSON NOT NULL,
+  updated_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3)
+);
+
+CREATE TABLE IF NOT EXISTS job_script_options (
+ job_id BIGINT NOT NULL PRIMARY KEY,
+ options_json JSON NOT NULL,
+ updated_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3)
+);
+
+CREATE TABLE IF NOT EXISTS installation_script_options (
+  installation_id VARCHAR(128) NOT NULL PRIMARY KEY,
+  options_json JSON NOT NULL,
+  updated_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3)
+);
+CREATE TABLE IF NOT EXISTS installation_script_variable (
+  variable_id VARCHAR(36) NOT NULL PRIMARY KEY,
+  installation_id VARCHAR(128) NOT NULL,
+  name_key VARCHAR(128) NOT NULL,
+  variable_json JSON NOT NULL,
+  updated_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+  KEY idx_script_variable_name(installation_id,name_key)
+);

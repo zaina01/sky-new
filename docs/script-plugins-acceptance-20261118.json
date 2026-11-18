@@ -1,0 +1,381 @@
+{
+  "date": "2026-11-18",
+  "timeZone": "Asia/Shanghai",
+  "completedAt": "2026-11-18T13:51:38.033717+08:00",
+  "passed": true,
+  "scope": "Independent test databases and temporary deployments; no production migration",
+  "baselineCommit": "ac7c4ff74c81d5ad9bc333d3e0824e3afeb1b9e8",
+  "windows": {
+    "mysqlVersion": "8.0.36",
+    "jdk": "25",
+    "node": "24.11.1",
+    "python": "3.12.9",
+    "databaseChecks": [
+      {
+        "name": "fresh schema on real MySQL",
+        "passed": true
+      },
+      {
+        "name": "upgrade-script-plugins-mysql.sql",
+        "passed": true
+      },
+      {
+        "name": "upgrade-standalone-scripts-mysql.sql",
+        "passed": true
+      },
+      {
+        "name": "upgrade-instance-script-options-mysql.sql",
+        "passed": true
+      },
+      {
+        "name": "merge upgrade preserves row identity/ciphertext and permits duplicate names",
+        "passed": true
+      },
+      {
+        "name": "fresh and upgraded schemas have identical columns and indexes",
+        "passed": true
+      }
+    ],
+    "runtimeChecks": [
+      {
+        "name": "node initialize via API and persistent MySQL store",
+        "passed": true
+      },
+      {
+        "name": "node install real dependency",
+        "passed": true
+      },
+      {
+        "name": "node failed upgrade leaves current revision unchanged",
+        "passed": true
+      },
+      {
+        "name": "node successful upgrade",
+        "passed": true
+      },
+      {
+        "name": "python initialize via API and persistent MySQL store",
+        "passed": true
+      },
+      {
+        "name": "python install real dependency",
+        "passed": true
+      },
+      {
+        "name": "python failed upgrade leaves current revision unchanged",
+        "passed": true
+      },
+      {
+        "name": "python successful upgrade",
+        "passed": true
+      },
+      {
+        "name": "node ZIP SDK/config/accounts/data callbacks through real MySQL",
+        "passed": true
+      },
+      {
+        "name": "python ZIP SDK/config/accounts/data callbacks through real MySQL",
+        "passed": true
+      },
+      {
+        "name": "js standalone: encryption/merge/isolation/rollback/snapshot/concurrency/cancel/timeout/Quartz/cleanup",
+        "passed": true
+      },
+      {
+        "name": "mjs standalone: encryption/merge/isolation/rollback/snapshot/concurrency/cancel/timeout/Quartz/cleanup",
+        "passed": true
+      },
+      {
+        "name": "py standalone: encryption/merge/isolation/rollback/snapshot/concurrency/cancel/timeout/Quartz/cleanup",
+        "passed": true
+      },
+      {
+        "name": "real HTTP role permissions and SELF data scope",
+        "passed": true
+      },
+      {
+        "name": "persisted installations, executions, logs and environment health",
+        "passed": true
+      }
+    ],
+    "rollback": [
+      {
+        "name": "real MySQL rollback of variable and revision when audit insert fails",
+        "passed": true
+      }
+    ],
+    "startupAndRestart": [
+      {
+        "name": "startup warns for legacy options; installation execution blocks until explicitly cleared",
+        "passed": true
+      },
+      {
+        "name": "restart preserves encrypted variables, arguments, revisions, SDK and historical logs",
+        "passed": true
+      }
+    ],
+    "finalVerification": [
+      {
+        "name": "persisted installations, executions, logs and environment health",
+        "passed": true
+      }
+    ],
+    "browser": [
+      {
+        "passed": true,
+        "browser": "Chrome",
+        "mockedApi": false,
+        "executionId": 51,
+        "checks": [
+          "UI login",
+          "encrypted variable creation",
+          "custom merge separator persisted",
+          "multiline arguments persisted",
+          "UI/API/MySQL/Runner execution",
+          "no browser errors"
+        ]
+      },
+      {
+        "passed": true,
+        "browser": "Chrome",
+        "mockedApi": false,
+        "executionId": 52,
+        "checks": [
+          "UI login",
+          "encrypted variable creation",
+          "custom merge separator persisted",
+          "multiline arguments persisted",
+          "UI/API/MySQL/Runner execution",
+          "no browser errors"
+        ]
+      }
+    ],
+    "cleanup": {
+      "passed": true,
+      "removed": [
+        "two dedicated Windows acceptance databases",
+        "temporary host encryption key/JWT secret",
+        "temporary account state files"
+      ],
+      "businessDatabaseModified": false
+    }
+  },
+  "linux": {
+    "mysqlVersion": "8.4.13",
+    "jdk": "25.0.5",
+    "node": "24.22.3",
+    "python": "3.12.3",
+    "image": {
+      "image": "sha256:6e1c899047142bdf45cf3bf664a0a8b37fb33169d80ca99e2f36ef53e60d7b5f linux/amd64",
+      "production": [
+        "sky-new-web-1 Up 40 minutes (healthy)",
+        "sky-new-backend-1 Up 40 minutes (healthy)",
+        "sky-new-mysql-1 Up 40 minutes (healthy)"
+      ],
+      "mysqlTimeZone": "CST"
+    },
+    "databaseChecks": [
+      {
+        "name": "fresh schema on real MySQL",
+        "passed": true
+      },
+      {
+        "name": "upgrade-script-plugins-mysql.sql",
+        "passed": true
+      },
+      {
+        "name": "upgrade-standalone-scripts-mysql.sql",
+        "passed": true
+      },
+      {
+        "name": "upgrade-instance-script-options-mysql.sql",
+        "passed": true
+      },
+      {
+        "name": "merge upgrade preserves row identity/ciphertext and permits duplicate names",
+        "passed": true
+      },
+      {
+        "name": "fresh and upgraded schemas have identical columns and indexes",
+        "passed": true
+      }
+    ],
+    "runtimeChecks": [
+      {
+        "name": "node initialize via API and persistent MySQL store",
+        "passed": true
+      },
+      {
+        "name": "node install real dependency",
+        "passed": true
+      },
+      {
+        "name": "node failed upgrade leaves current revision unchanged",
+        "passed": true
+      },
+      {
+        "name": "node successful upgrade",
+        "passed": true
+      },
+      {
+        "name": "python initialize via API and persistent MySQL store",
+        "passed": true
+      },
+      {
+        "name": "python install real dependency",
+        "passed": true
+      },
+      {
+        "name": "python failed upgrade leaves current revision unchanged",
+        "passed": true
+      },
+      {
+        "name": "python successful upgrade",
+        "passed": true
+      },
+      {
+        "name": "node ZIP SDK/config/accounts/data callbacks through real MySQL",
+        "passed": true
+      },
+      {
+        "name": "python ZIP SDK/config/accounts/data callbacks through real MySQL",
+        "passed": true
+      },
+      {
+        "name": "js standalone: encryption/merge/isolation/rollback/snapshot/concurrency/cancel/timeout/Quartz/cleanup",
+        "passed": true
+      },
+      {
+        "name": "mjs standalone: encryption/merge/isolation/rollback/snapshot/concurrency/cancel/timeout/Quartz/cleanup",
+        "passed": true
+      },
+      {
+        "name": "py standalone: encryption/merge/isolation/rollback/snapshot/concurrency/cancel/timeout/Quartz/cleanup",
+        "passed": true
+      },
+      {
+        "name": "real HTTP role permissions and SELF data scope",
+        "passed": true
+      },
+      {
+        "name": "persisted installations, executions, logs and environment health",
+        "passed": true
+      }
+    ],
+    "restart": [
+      {
+        "name": "persisted installations, executions, logs and environment health",
+        "passed": true
+      }
+    ],
+    "restoredExecution": [
+      {
+        "name": "persisted installations, executions, logs and environment health",
+        "passed": true
+      }
+    ],
+    "outageRecovery": [
+      {
+        "name": "persisted installations, executions, logs and environment health",
+        "passed": true
+      }
+    ],
+    "recovery": [
+      {
+        "name": "consistent test database and plugin volume backups created",
+        "passed": true
+      },
+      {
+        "name": "fresh MySQL and plugin volumes restored; encrypted configuration, dependencies, SDK, raw scripts and historical logs work",
+        "passed": true
+      },
+      {
+        "name": "Nginx history routes and API forwarding survive backend recreation",
+        "passed": true
+      },
+      {
+        "name": "database outage returns HTTP 503; restored database connection and script execution recover",
+        "passed": true
+      }
+    ],
+    "browser": [
+      {
+        "passed": true,
+        "browser": "Chrome",
+        "mockedApi": false,
+        "executionId": 70,
+        "checks": [
+          "UI login",
+          "encrypted variable creation",
+          "custom merge separator persisted",
+          "multiline arguments persisted",
+          "UI/API/MySQL/Runner execution",
+          "no browser errors"
+        ]
+      },
+      {
+        "passed": true,
+        "browser": "Chrome",
+        "mockedApi": false,
+        "executionId": 71,
+        "checks": [
+          "UI login",
+          "encrypted variable creation",
+          "custom merge separator persisted",
+          "multiline arguments persisted",
+          "UI/API/MySQL/Runner execution",
+          "no browser errors"
+        ]
+      }
+    ],
+    "cleanup": {
+      "passed": true,
+      "removed": [
+        "three acceptance containers",
+        "two acceptance volumes",
+        "acceptance network",
+        "test backups",
+        "temporary credentials"
+      ],
+      "production": [
+        "sky-new-web-1 Up 41 minutes (healthy)",
+        "sky-new-backend-1 Up 41 minutes (healthy)",
+        "sky-new-mysql-1 Up 41 minutes (healthy)"
+      ],
+      "retained": [
+        "acceptance source",
+        "acceptance image",
+        "reports and logs"
+      ]
+    }
+  },
+  "regression": {
+    "sky-job": {
+      "tests": 197,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    "sky-plugin-runner-java": {
+      "tests": 3,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    "nativeRunnerProtocolGroups": 7
+  },
+  "fixedIssues": [
+    "Windows generated script IDs caused an excessively long process working directory",
+    "Database write errors were misreported as HTTP 401; now return HTTP 500 without SQL/value disclosure"
+  ],
+  "limitations": [
+    "linux/arm64 not tested",
+    "No production data migration",
+    "No production load test"
+  ],
+  "sourceSha256": {
+    "scripts/accept-script-plugins.py": "994f512d409849902e2c8764869964757954364e7a873365166552d618afc570",
+    "sky-job/src/main/java/com/sky/job/scheduler/JobExecutionService.java": "e784452c3ddcd280881039bce1b0f96835cbd8b73c16e622c8dab237aa22541e",
+    "sky-job/src/main/java/com/sky/job/web/GlobalExceptionHandler.java": "9999bb64c1fd10d1a12d8f3b1406f43f09aa8ab29669a88b09ab2be0849fd481"
+  }
+}

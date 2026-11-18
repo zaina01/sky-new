@@ -39,6 +39,10 @@ public class JobExecutionStore {
         throw new IllegalStateException("Job execution was not saved");
     }
 
+    public void updateRuntimeSnapshot(long id, String engine, String sha, String revision, String version, String mode) { mapper.updateRuntimeSnapshot(id, engine, sha, revision, version, mode); }
+
+    public void updateScriptOptionsRevision(long id,String revision) { mapper.updateScriptOptionsRevision(id,revision); }
+
     public void updateRequestId(long id, String requestId) { mapper.updateRequestId(id, requestId); }
 
     public void markTerminal(long id, JobExecutionStatus status, String message, String resultJson, String errorType, String errorMessage, LocalDateTime startedAt, LocalDateTime finishedAt) {
@@ -94,7 +98,7 @@ public class JobExecutionStore {
                 row.id(), row.jobId(), row.pluginInstallationId(), row.pluginId(), row.instanceId(), row.requestId(),
                 JobExecutionStatus.valueOf(row.status()), JobTriggerType.valueOf(row.triggerType()), row.jobName(),
                 row.startedAt(), row.finishedAt(), row.durationMillis(), row.message(), row.resultJson(), row.errorType(),
-                row.errorMessage(), row.runnerLogPath(), row.ownerUserId(), row.ownerDepartmentId(), row.createdAt()
+                row.errorMessage(), row.runnerLogPath(), row.ownerUserId(), row.ownerDepartmentId(), row.createdAt(), row.runtimeEngine(), row.artifactSha256(), row.environmentRevision(), row.interpreterVersion(), row.executionMode(), row.scriptOptionsRevision()
         );
     }
 

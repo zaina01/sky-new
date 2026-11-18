@@ -155,7 +155,7 @@ public class JobStore {
                 row.createdBy(),
                 row.updatedBy(),
                 row.createdAt(),
-                row.updatedAt()
+                row.updatedAt(), row.executionMode()
         );
     }
 

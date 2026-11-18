@@ -10,6 +10,20 @@ public record PluginOptionResponse(
         String version,
         String ownerUserId,
         Long ownerDepartmentId,
-        PluginRuntimeState state
+        PluginRuntimeState state,
+        String executionMode
 ) {
+    public PluginOptionResponse(
+        String installationId,
+        String pluginId,
+        String installationName,
+        String pluginName,
+        String version,
+        String ownerUserId,
+        Long ownerDepartmentId,
+        PluginRuntimeState state
+    ) {
+        this(installationId, pluginId, installationName, pluginName, version, ownerUserId, ownerDepartmentId, state, "plugin");
+    }
+
 }

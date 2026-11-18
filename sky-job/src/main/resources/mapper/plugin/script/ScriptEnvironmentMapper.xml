@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.sky.job.plugin.script.mapper.ScriptEnvironmentMapper">
+    <select id="get" resultType="string">SELECT document_json FROM script_environment_document WHERE document_key=#{key}</select>
+    <select id="list" resultType="string">SELECT document_json FROM script_environment_document WHERE document_key LIKE CONCAT(#{prefix}, '%') ORDER BY updated_at DESC</select>
+    <insert id="put">
+        INSERT INTO script_environment_document(document_key, document_json) VALUES(#{key}, CAST(#{json} AS JSON))
+        ON DUPLICATE KEY UPDATE document_json=VALUES(document_json), updated_at=CURRENT_TIMESTAMP(3)
+    </insert>
+</mapper>

@@ -41,7 +41,7 @@ public class PluginArtifactRegistry {
                 jsonNode(manifest.accountSchema()),
                 json(dependencies == null ? List.of() : dependencies),
                 overwriteDependencies,
-                uploadedBy == null ? "" : uploadedBy
+                uploadedBy == null ? "" : uploadedBy, manifest.runtime().engine(), manifest.runtime().entryPoint(), manifest.runtime().executionMode()
         );
         return manifest.pluginId();
     }

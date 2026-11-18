@@ -20,8 +20,11 @@ public class PluginArtifactController {
     @PostMapping
     public PluginUploadResult upload(
             @RequestParam("file") MultipartFile file,
+            @RequestParam(required=false) String pluginId,
+            @RequestParam(required=false) String displayName,
+            @RequestParam(required=false) String version,
             @AuthenticationPrincipal AuthenticatedUser user
     ) {
-        return service.upload(file, user.username());
+        return service.upload(file, user.username(),pluginId,displayName,version);
     }
 }

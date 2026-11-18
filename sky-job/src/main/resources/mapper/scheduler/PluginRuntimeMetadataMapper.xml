@@ -35,12 +35,15 @@
             <arg column="started_at" javaType="java.time.LocalDateTime"/>
             <arg column="created_at" javaType="java.time.LocalDateTime"/>
             <arg column="updated_at" javaType="java.time.LocalDateTime"/>
+            <arg column="runtime_engine" javaType="java.lang.String"/>
+            <arg column="entry_point" javaType="java.lang.String"/>
+            <arg column="execution_mode" javaType="java.lang.String"/>
         </constructor>
     </resultMap>
 
     <sql id="columns">
         i.id, i.installation_id, i.plugin_id, i.instance_id, i.installation_name,
-        d.version, d.display_name, d.main_class, d.artifact_path, d.artifact_sha256,
+        d.version, d.display_name, d.main_class, d.runtime_engine, d.entry_point, d.execution_mode, d.artifact_path, d.artifact_sha256,
         i.runtime_type, i.state, i.runner_host, i.runner_port, i.work_dir,
         d.capabilities_json, d.config_schema_json, d.account_schema_json, d.dependency_jars_json,
         i.remote_debug_enabled, i.remote_debug_port, i.remote_debug_suspend,

@@ -15,4 +15,10 @@ public record UpdateJobRequest(
         @Min(1) long timeoutMillis,
         String remark
 ) {
+
+    @com.fasterxml.jackson.annotation.JsonAnySetter
+    public void unknown(String name, com.fasterxml.jackson.databind.JsonNode value) {
+        if ("scriptOptions".equals(name) && value != null && !value.isNull() && !(value.isObject() && value.isEmpty()))
+            throw new IllegalArgumentException("Job scriptOptions is no longer supported; configure environment and arguments on the installation");
+    }
 }

@@ -38,6 +38,9 @@ public class ProcessPluginHealthChecker {
         Instant deadline = Instant.now().plus(timeout);
         StatusRuntimeException lastFailure = null;
         while (Instant.now().isBefore(deadline)) {
+            if (handle instanceof ProcessPluginRuntimeHandle process && !process.process().isAlive()) {
+                throw new IllegalStateException("Plugin runner exited before becoming healthy; see " + handle.logPath());
+            }
             ManagedChannel channel = NettyChannelBuilder.forAddress(new InetSocketAddress("127.0.0.1", handle.port()))
                     .eventLoopGroup(eventLoopGroup)
                     .channelType(NioSocketChannel.class)

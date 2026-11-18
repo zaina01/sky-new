@@ -18,7 +18,9 @@ public interface PluginArtifactRegistryMapper {
             @Param("accountSchemaJson") String accountSchemaJson,
             @Param("dependencyJarsJson") String dependencyJarsJson,
             @Param("overwriteDependencies") boolean overwriteDependencies,
-            @Param("uploadedBy") String uploadedBy
+            @Param("uploadedBy") String uploadedBy,
+            @Param("runtimeEngine") String runtimeEngine,
+            @Param("entryPoint") String entryPoint, @Param("executionMode") String executionMode
     );
 
     int updateDependencyJars(

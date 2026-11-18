@@ -77,7 +77,9 @@ public class PluginDependencyManagementService {
     }
 
     private PluginDefinition definition(String pluginId) {
-        return registry.find(pluginId).orElseThrow(() -> new IllegalArgumentException("Plugin definition not found"));
+        PluginDefinition definition = registry.find(pluginId).orElseThrow(() -> new IllegalArgumentException("Plugin definition not found"));
+        if (!"java".equals(definition.runtimeEngine())) throw new IllegalArgumentException("Use script environment dependencies for this plugin");
+        return definition;
     }
 
     private String mode(String value) {

@@ -8,7 +8,8 @@ network="$prefix"
 mysql="$prefix-mysql"
 backend="$prefix-backend"
 volume="$prefix-plugins"
-password="smoke-${RANDOM}-${RANDOM}"
+password=$(python3 -c 'import secrets; print(secrets.token_hex(24))')
+encryption_key=$(python3 -c 'import base64,secrets; print(base64.b64encode(secrets.token_bytes(32)).decode())')
 root_dir=$(cd "$(dirname "$0")/.." && pwd)
 state=$(mktemp)
 cleanup() {
@@ -28,6 +29,7 @@ trap cleanup EXIT
 docker network create "$network" >/dev/null
 docker volume create "$volume" >/dev/null
 docker run -d --name "$mysql" --network "$network" --network-alias mysql \
+  -e TZ=Asia/Shanghai \
   -e MYSQL_DATABASE=sky_new -e MYSQL_USER=sky -e MYSQL_PASSWORD="$password" \
   -e MYSQL_ROOT_PASSWORD="$password" \
   --mount "type=bind,src=$root_dir/sql/schema-mysql.sql,dst=/docker-entrypoint-initdb.d/01-schema.sql,readonly" \
@@ -47,6 +49,7 @@ start_backend() {
     -e "SKY_DB_URL=jdbc:mysql://mysql:3306/sky_new?serverTimezone=Asia/Shanghai&useSSL=false&allowPublicKeyRetrieval=true" \
     -e SKY_DB_USERNAME=sky -e "SKY_DB_PASSWORD=$password" \
     -e SKY_JWT_SECRET=smoke-only-secret-at-least-thirty-two-bytes \
+    -e "SKY_SCRIPT_ENV_ENCRYPTION_KEY=$encryption_key" \
     "$image" >/dev/null
   ready=false
   for attempt in {1..120}; do
@@ -57,9 +60,11 @@ start_backend() {
   [[ "$ready" == true ]]
   port=$(docker port "$backend" 8080/tcp | head -n 1 | awk -F: '{print $NF}')
 }
-docker run --rm --entrypoint /opt/java/openjdk/bin/java "$image" -version
+docker run --rm --entrypoint sh "$image" -c \
+  'set -e; test "$(id -u)" = 10001; java -version; node --version; python3.12 --version; test "$(env -u TZ date +%z)" = +0800'
 start_backend
 python3 "$root_dir/scripts/deployment-smoke.py" "http://127.0.0.1:$port" "$plugin" "$state" initialize
+python3 "$root_dir/scripts/script-deployment-smoke.py" "http://127.0.0.1:$port" "$state" initialize
 # Verify persistence and restored scheduling after replacement with the same volume.
 docker top "$backend" -eo pid,args | grep -q '/app/runner.jar'
 docker stop --time 60 "$backend" >/dev/null
@@ -67,6 +72,7 @@ docker stop --time 60 "$backend" >/dev/null
 docker rm "$backend" >/dev/null
 start_backend
 python3 "$root_dir/scripts/deployment-smoke.py" "http://127.0.0.1:$port" "$plugin" "$state" verify
+python3 "$root_dir/scripts/script-deployment-smoke.py" "http://127.0.0.1:$port" "$state" verify
 # A disconnected DB must change readiness to HTTP 503 without leaking details.
 docker stop "$mysql" >/dev/null
 docker exec "$backend" sh -c \

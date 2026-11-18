@@ -1,0 +1,10 @@
+{
+  "formatVersion": 1,
+  "pluginId": "demo-python",
+  "version": "1.0.0",
+  "displayName": "Python 示例",
+  "runtime": { "engine": "python", "entry": "main.py" },
+  "capabilities": { "task": true, "config": true, "account": true, "notification": true, "service": false },
+  "configSchema": { "fields": [{ "name": "message", "label": "消息", "type": "TEXT" }] },
+  "accountSchema": { "accountIdField": "accountId", "fields": [{ "name": "accountId", "label": "账号 ID", "type": "TEXT", "accountId": true, "required": true }] }
+}

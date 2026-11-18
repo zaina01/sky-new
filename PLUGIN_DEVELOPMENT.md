@@ -1,6 +1,20 @@
 # Sky 插件开发文档
 
-本文档面向插件开发者，说明如何基于当前项目的 `sky-plugin-api` 开发、打包和上传 Java 插件。
+本文档是插件开发入口。平台支持 Java 插件、JavaScript / Python ZIP SDK 插件，以及普通单文件脚本；根据需要选择开发方式：
+
+| 开发方式 | 入口和上传格式 | 适用场景与文档 |
+| --- | --- | --- |
+| Java 插件 | `TaskPlugin` / `ServicePlugin`，上传 JAR | 类型化配置、账户和任务/服务能力；见本文后续章节 |
+| JavaScript / Python SDK 插件 | `run(ctx)`，上传含 `sky-script.json` 的 ZIP | 使用平台配置、账户、数据、通知和服务调用；见 [JS / Python SDK 开发](docs/script-plugins.md) |
+| 普通单文件脚本 | 直接上传 `.js` / `.mjs` / `.py` | 通过环境变量和命令行参数运行已有程序；见 [单文件脚本开发与配置](docs/standalone-scripts.md) |
+
+JS / Python 使用 Node.js 24 / Python 3.12，由平台原生 Runner 执行；SDK 插件可调用已有服务，当前不提供脚本服务入口。单文件脚本使用安装实例级变量、合并分隔符和参数，同实例下的任务共享配置。
+
+示例目录分别为 `plugin-demo`、`plugin-demo-node`、`plugin-demo-python` 和 `plugin-demo-standalone`。执行 `python scripts/build-script-plugins.py` 可将两种 SDK 示例打包到 `build/script-plugins/`；单文件示例直接上传。SDK 的打包结构、依赖安装与返回值要求见对应专题。
+
+平台环境初始化、数据库升级、多语言镜像和加密密钥由部署方配置，见 [SDK 部署要求](docs/script-plugins.md#升级与部署)、[单文件升级说明](docs/standalone-scripts.md#部署升级) 和 [Docker 部署](docs/docker-deployment.md)。插件作者无需把平台 Runner 或共享依赖环境打入自己的插件包。
+
+**下文第 1–21 节为 Java 插件开发说明**，其中 `@SkyPlugin`、SPI 和 JAR 打包规则适用于 Java 模式。
 
 ## 1. 插件模型
 

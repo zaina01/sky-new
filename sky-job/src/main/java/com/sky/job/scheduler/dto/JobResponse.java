@@ -30,8 +30,33 @@ public record JobResponse(
         String createdBy,
         String updatedBy,
         LocalDateTime createdAt,
-        LocalDateTime updatedAt
+        LocalDateTime updatedAt,
+        String executionMode
 ) {
+    public JobResponse(
+        long id,
+        String jobName,
+        String pluginInstallationId,
+        String pluginId,
+        String pluginDisplayName,
+        String cronExpression,
+        JobStatus jobStatus,
+        MisfirePolicy misfirePolicy,
+        boolean concurrent,
+        String inputJson,
+        long timeoutMillis,
+        ExecutedStatus executedStatus,
+        String remark,
+        List<String> notificationChannelIds,
+        String ownerUserId,
+        String ownerUsername,
+        Long ownerDepartmentId,
+        String ownerDepartmentName,
+        String createdBy,
+        String updatedBy,
+        LocalDateTime createdAt,
+        LocalDateTime updatedAt
+    ) { this(id, jobName, pluginInstallationId, pluginId, pluginDisplayName, cronExpression, jobStatus, misfirePolicy, concurrent, inputJson, timeoutMillis, executedStatus, remark, notificationChannelIds, ownerUserId, ownerUsername, ownerDepartmentId, ownerDepartmentName, createdBy, updatedBy, createdAt, updatedAt, "plugin"); }
     public static JobResponse from(ScheduledJob job) {
         return from(job, List.of());
     }
@@ -59,7 +84,7 @@ public record JobResponse(
                 job.createdBy(),
                 job.updatedBy(),
                 job.createdAt(),
-                job.updatedAt()
+                job.updatedAt(), job.executionMode()
         );
     }
 }

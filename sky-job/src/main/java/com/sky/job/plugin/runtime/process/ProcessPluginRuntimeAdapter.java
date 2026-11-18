@@ -26,6 +26,7 @@ public class ProcessPluginRuntimeAdapter implements PluginRuntimeAdapter {
     private final ProcessPluginRuntimeProperties properties;
     private final DynamicProcessPluginRuntimeSettings runtimeSettings;
     private final PluginRuntimeTokenRegistry tokenRegistry;
+    private final com.sky.job.plugin.script.ScriptRuntimeLauncher scripts;
 
     public ProcessPluginRuntimeAdapter(
             ProcessPluginPortAllocator portAllocator,
@@ -34,7 +35,8 @@ public class ProcessPluginRuntimeAdapter implements PluginRuntimeAdapter {
             ProcessPluginHealthChecker healthChecker,
             ProcessPluginRuntimeProperties properties,
             DynamicProcessPluginRuntimeSettings runtimeSettings,
-            PluginRuntimeTokenRegistry tokenRegistry
+            PluginRuntimeTokenRegistry tokenRegistry,
+            com.sky.job.plugin.script.ScriptRuntimeLauncher scripts
     ) {
         this.portAllocator = portAllocator;
         this.commandBuilder = commandBuilder;
@@ -43,10 +45,12 @@ public class ProcessPluginRuntimeAdapter implements PluginRuntimeAdapter {
         this.properties = properties;
         this.runtimeSettings = runtimeSettings;
         this.tokenRegistry = tokenRegistry;
+        this.scripts = scripts;
     }
 
     @Override
     public PluginRuntimeHandle start(PluginRuntimeSpec spec) {
+        if (!"java".equals(spec.runtimeEngine())) return scripts.start(spec);
         validator.validate(spec);
         String token = tokenRegistry.register(
                 spec.installationId(),
@@ -104,6 +108,7 @@ public class ProcessPluginRuntimeAdapter implements PluginRuntimeAdapter {
 
     @Override
     public void stop(PluginRuntimeHandle handle, Duration timeout) {
+        if (handle instanceof com.sky.job.plugin.script.ScriptRuntimeLauncher.Handle script) { script.stop(timeout); return; }
         try {
             if (!(handle instanceof ProcessPluginRuntimeHandle processHandle)) {
                 return;
@@ -126,6 +131,7 @@ public class ProcessPluginRuntimeAdapter implements PluginRuntimeAdapter {
 
     @Override
     public PluginRuntimeState inspect(PluginRuntimeHandle handle) {
+        if (handle instanceof com.sky.job.plugin.script.ScriptRuntimeLauncher.Handle script) return script.alive() ? PluginRuntimeState.RUNNING : PluginRuntimeState.STOPPED;
         if (handle instanceof ProcessPluginRuntimeHandle processHandle && processHandle.process().isAlive()) {
             return PluginRuntimeState.RUNNING;
         }

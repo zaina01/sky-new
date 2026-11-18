@@ -10,6 +10,8 @@ import java.util.Map;
 import com.sky.job.security.EffectiveDataScope;
 
 public interface JobExecutionMapper {
+    void updateScriptOptionsRevision(@Param("id") long id,@Param("revision") String revision);
+    void updateRuntimeSnapshot(@Param("id") long id, @Param("engine") String engine, @Param("sha") String sha, @Param("revision") String revision, @Param("version") String version, @Param("mode") String mode);
     int insertRunning(Map<String, Object> values);
 
     int updateRequestId(@Param("id") long id, @Param("requestId") String requestId);

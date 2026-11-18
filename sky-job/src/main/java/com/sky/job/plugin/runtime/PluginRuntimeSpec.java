@@ -22,8 +22,55 @@ public record PluginRuntimeSpec(
         boolean remoteDebugSuspend,
         String runId,
         Long jobId,
-        Long executionId
+        Long executionId,
+        String runtimeEngine,
+        String entryPoint,
+        String executionMode
 ) {
+    public PluginRuntimeSpec(
+        String installationId,
+        String pluginId,
+        String instanceId,
+        String mainClass,
+        Path artifactPath,
+        String artifactSha256,
+        Path workDir,
+        int hostGrpcPort,
+        List<Path> dependencyPaths,
+        Set<PluginCapability> capabilities,
+        boolean remoteDebugEnabled,
+        int remoteDebugPort,
+        boolean remoteDebugSuspend,
+        String runId,
+        Long jobId,
+        Long executionId,
+        String runtimeEngine,
+        String entryPoint
+    ) {
+        this(installationId, pluginId, instanceId, mainClass, artifactPath, artifactSha256, workDir, hostGrpcPort, dependencyPaths, capabilities, remoteDebugEnabled, remoteDebugPort, remoteDebugSuspend, runId, jobId, executionId, runtimeEngine, entryPoint, "plugin");
+    }
+
+    public PluginRuntimeSpec(
+        String installationId,
+        String pluginId,
+        String instanceId,
+        String mainClass,
+        Path artifactPath,
+        String artifactSha256,
+        Path workDir,
+        int hostGrpcPort,
+        List<Path> dependencyPaths,
+        Set<PluginCapability> capabilities,
+        boolean remoteDebugEnabled,
+        int remoteDebugPort,
+        boolean remoteDebugSuspend,
+        String runId,
+        Long jobId,
+        Long executionId
+    ) {
+        this(installationId, pluginId, instanceId, mainClass, artifactPath, artifactSha256, workDir, hostGrpcPort, dependencyPaths, capabilities, remoteDebugEnabled, remoteDebugPort, remoteDebugSuspend, runId, jobId, executionId, "java", mainClass);
+    }
+
     public PluginRuntimeSpec {
         if (remoteDebugPort <= 0) remoteDebugPort = 5005;
         runId = runId == null || runId.isBlank() ? java.util.UUID.randomUUID().toString() : runId;

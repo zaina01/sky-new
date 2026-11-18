@@ -168,6 +168,7 @@ class PluginRuntimeServiceTest {
                 runtimeProperties,
                 runtimeSettings,
                 jobStore,
+                org.mockito.Mockito.mock(com.sky.job.plugin.script.InstallationScriptOptionsStore.class),
                 configStore,
                 accountStore,
                 accountGroupStore,

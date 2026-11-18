@@ -1,12 +1,13 @@
 # Docker Compose 部署
 
-部署由 `web`（Nginx + Vue）、`backend`（Java 25 主程序 + Runner）和 `mysql`（MySQL 8.4）组成。仅 HTTP 端口对外开放；插件子进程在后端容器内通过回环地址调用主程序。后端保持一个实例，不能直接通过 Compose 扩容，否则当前内存 Quartz 和启动恢复逻辑可能重复调度、重置执行状态。
+部署由 `web`（Nginx + Vue）、`backend`（Java 25 主程序 + Java/Node/Python Runner）和 `mysql`（MySQL 8.4）组成。仅 HTTP 端口对外开放；插件子进程在后端容器内通过回环地址调用主程序。后端保持一个实例，不能直接通过 Compose 扩容，否则当前内存 Quartz 和启动恢复逻辑可能重复调度、重置执行状态。
 
 ## 1. 发布镜像
 
 两个仓库各自包含 Dockerfile 和 `.github/workflows/docker.yml`：
 
 - 后端：`ghcr.io/zaina01/sky-new`。
+- 后端工作流使用 `Dockerfile.multilang`，包含 JDK 25、Node 24、Python 3.12 和三种 Runner；根目录 `Dockerfile` 保留为手动构建的 Java 专用镜像。
 - 前端：`ghcr.io/zaina01/sky-vue-new`。
 - PR：测试和双架构镜像构建、容器冒烟验证，不推送镜像。
 - 默认分支：上述检查成功后发布 `sha-<完整提交号>` 和 `latest`。
@@ -53,12 +54,13 @@ sky-new/
 
 需要修改源码的开发者也可选择克隆仓库，然后执行 `cp .env.example .env` 和 `chmod 600 .env`；源码启动说明见 [项目 README](../README.md#本地开发)。镜像部署不需要前端源码。
 
-编辑 `.env`，填写三个必填密钥，每项可独立用 `openssl rand -hex 32` 生成：
+编辑 `.env`，填写四个必填密钥。数据库密码与 JWT 密钥分别使用独立的 `openssl rand -hex 32`，脚本变量加密密钥使用 `openssl rand -base64 32`（解码后恰好 32 字节）：
 
 ```dotenv
 SKY_DB_PASSWORD=填写生成的随机值
 MYSQL_ROOT_PASSWORD=填写另一个随机值
 SKY_JWT_SECRET=填写至少32字节的随机值
+SKY_SCRIPT_ENV_ENCRYPTION_KEY=填写独立生成的32字节Base64密钥
 BACKEND_TAG=sha-后端完整提交号
 FRONTEND_TAG=sha-前端完整提交号
 SKY_HTTP_BIND=0.0.0.0
@@ -66,6 +68,8 @@ SKY_HTTP_PORT=80
 ```
 
 示例文件将密钥留空，空值会使 Compose 拒绝启动；长度不足的 JWT 密钥会使应用启动失败。使用随机十六进制值可以避免 `.env` 中 `$` 插值和特殊字符引用问题。不要提交 `.env`；`docker compose config` 展开后包含密钥，检查时使用 `--quiet`。
+
+`SKY_SCRIPT_ENV_ENCRYPTION_KEY` 没有内置默认密钥。重启、更新与容器重建必须保留原值，并与数据库备份一起安全保管；数据库和插件卷本身不包含密钥。已有加密变量的旧部署，应先确认并外置原有效密钥；如果曾依赖旧默认值，也应沿用其有效值验证解密，不能直接生成新密钥覆盖。本版不自动重加密或在线轮换，详见 [单文件脚本升级说明](standalone-scripts.md)。
 
 默认标签是 `latest`，生产部署建议记录两个不可变提交号或版本标签。前后端版本独立，不能将后端提交号直接用作前端标签。默认数据库名为 `sky_new`、应用数据库用户为 `sky`，root 仅用于初始化、备份和恢复。若 80 端口被占用，可将 `.env` 中 `SKY_HTTP_PORT` 改为 `8088`，并在防火墙或云安全组中放行所选端口。
 
@@ -196,13 +200,13 @@ HTTP 到 HTTPS 的跳转、证书签发和续期由现有代理负责；将域�
 
 ## 7. 容器验收与排查
 
-工作流对两种 CPU 架构分别进行容器启动验证。后端冒烟使用独立的临时 MySQL、网络和卷，验证管理员登录、超过 1MB 的插件上传、Runner 任务、配置与账号回调、日志读取、容器重建后数据保留和数据库断连健康状态。使用已有 `frontendIntegrationPluginJar` 作为独立样例；`plugin-demo` 当前会调用其他业务插件，不适合独立冒烟。
+工作流先执行 Java/Node 单元测试和两种原生 Runner 的 gRPC 协议检查，再对两种 CPU 架构分别构建多语言镜像并进行容器验证。后端冒烟使用独立的临时 MySQL、网络和卷，验证管理员登录、超过 1MB 的 Java 插件上传、Java/Node/Python SDK 回调、`.js`/`.mjs`/`.py` 单文件执行、变量加密与同名合并、参数、退出码、日志、使用相同密钥重建容器后的解密和执行、数据库断连健康状态。两个架构都成功后才合并发布最终镜像标签。Java 部分使用 `frontendIntegrationPluginJar`；`plugin-demo` 当前会调用其他业务插件，不适合独立冒烟。
 
 在有 Docker 的开发环境手动运行后端冒烟：
 
 ```bash
 bash ./gradlew :sky-job:frontendIntegrationPluginJar
-docker build -t sky-backend:local .
+docker build -f Dockerfile.multilang -t sky-backend:local .
 bash scripts/docker-smoke.sh sky-backend:local sky-job/build/fixtures/frontend-integration-plugin.jar
 ```
 
